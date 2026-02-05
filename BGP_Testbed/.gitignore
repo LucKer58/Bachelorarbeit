@@ -1,0 +1,16 @@
+# Docker & Containerlab
+.clab/
+*.log
+*.tar
+nodes/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
