@@ -1,0 +1,17 @@
+name: bgp-testbed
+
+topology:
+  nodes:
+    router1:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+        - configs/frr1.conf:/etc/frr/frr.conf
+    router2:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+        - configs/frr2.conf:/etc/frr/frr.conf
+
+  links:
+    - endpoints: ["router1:eth1", "router2:eth1"]
