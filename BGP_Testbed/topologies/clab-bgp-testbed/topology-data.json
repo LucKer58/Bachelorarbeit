@@ -1,0 +1,227 @@
+{
+  "name": "bgp-testbed",
+  "type": "clab",
+  "clab": {
+    "config": {
+      "prefix": "clab",
+      "mgmt": {
+        "network": "clab",
+        "bridge": "br-e2757a5713fd",
+        "ipv4-subnet": "172.20.20.0/24",
+        "ipv4-gw": "172.20.20.1",
+        "ipv6-subnet": "3fff:172:20:20::/64",
+        "ipv6-gw": "3fff:172:20:20::1",
+        "external-access": true
+      }
+    }
+  },
+  "ssh-pub-keys": [],
+  "nodes": {
+    "router1": {
+      "index": "0",
+      "shortname": "router1",
+      "longname": "clab-bgp-testbed-router1",
+      "fqdn": "router1.bgp-testbed.io",
+      "group": "",
+      "labdir": "/mnt/c/Dev/Bachelorarbeit/BGP_Testbed/topologies/clab-bgp-testbed/router1",
+      "kind": "linux",
+      "image": "frrouting/frr:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.2",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "3fff:172:20:20::2",
+      "mgmt-ipv6-prefix-length": 64,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-e2757a5713fd",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/mnt/c/Dev/Bachelorarbeit/BGP_Testbed/topologies/clab-bgp-testbed/router1",
+        "clab-node-longname": "clab-bgp-testbed-router1",
+        "clab-node-name": "router1",
+        "clab-node-type": "",
+        "clab-owner": "lucienkern",
+        "clab-topo-file": "/mnt/c/Dev/Bachelorarbeit/BGP_Testbed/topologies/lab.clab.yaml",
+        "containerlab": "bgp-testbed"
+      },
+      "port-bindings": [
+      ]
+    },
+    "router2": {
+      "index": "1",
+      "shortname": "router2",
+      "longname": "clab-bgp-testbed-router2",
+      "fqdn": "router2.bgp-testbed.io",
+      "group": "",
+      "labdir": "/mnt/c/Dev/Bachelorarbeit/BGP_Testbed/topologies/clab-bgp-testbed/router2",
+      "kind": "linux",
+      "image": "frrouting/frr:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.5",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "3fff:172:20:20::5",
+      "mgmt-ipv6-prefix-length": 64,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-e2757a5713fd",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/mnt/c/Dev/Bachelorarbeit/BGP_Testbed/topologies/clab-bgp-testbed/router2",
+        "clab-node-longname": "clab-bgp-testbed-router2",
+        "clab-node-name": "router2",
+        "clab-node-type": "",
+        "clab-owner": "lucienkern",
+        "clab-topo-file": "/mnt/c/Dev/Bachelorarbeit/BGP_Testbed/topologies/lab.clab.yaml",
+        "containerlab": "bgp-testbed"
+      },
+      "port-bindings": [
+      ]
+    },
+    "router3": {
+      "index": "2",
+      "shortname": "router3",
+      "longname": "clab-bgp-testbed-router3",
+      "fqdn": "router3.bgp-testbed.io",
+      "group": "",
+      "labdir": "/mnt/c/Dev/Bachelorarbeit/BGP_Testbed/topologies/clab-bgp-testbed/router3",
+      "kind": "linux",
+      "image": "frrouting/frr:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.4",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "3fff:172:20:20::4",
+      "mgmt-ipv6-prefix-length": 64,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-e2757a5713fd",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/mnt/c/Dev/Bachelorarbeit/BGP_Testbed/topologies/clab-bgp-testbed/router3",
+        "clab-node-longname": "clab-bgp-testbed-router3",
+        "clab-node-name": "router3",
+        "clab-node-type": "",
+        "clab-owner": "lucienkern",
+        "clab-topo-file": "/mnt/c/Dev/Bachelorarbeit/BGP_Testbed/topologies/lab.clab.yaml",
+        "containerlab": "bgp-testbed"
+      },
+      "port-bindings": [
+      ]
+    },
+    "router4": {
+      "index": "3",
+      "shortname": "router4",
+      "longname": "clab-bgp-testbed-router4",
+      "fqdn": "router4.bgp-testbed.io",
+      "group": "",
+      "labdir": "/mnt/c/Dev/Bachelorarbeit/BGP_Testbed/topologies/clab-bgp-testbed/router4",
+      "kind": "linux",
+      "image": "frrouting/frr:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.3",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "3fff:172:20:20::3",
+      "mgmt-ipv6-prefix-length": 64,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-e2757a5713fd",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/mnt/c/Dev/Bachelorarbeit/BGP_Testbed/topologies/clab-bgp-testbed/router4",
+        "clab-node-longname": "clab-bgp-testbed-router4",
+        "clab-node-name": "router4",
+        "clab-node-type": "",
+        "clab-owner": "lucienkern",
+        "clab-topo-file": "/mnt/c/Dev/Bachelorarbeit/BGP_Testbed/topologies/lab.clab.yaml",
+        "containerlab": "bgp-testbed"
+      },
+      "port-bindings": [
+      ]
+    }
+  },
+  "links": [
+    {
+      "endpoints": {
+        "a": {
+          "node": "router1",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:2d:31:12",
+          "peer": "z"
+        },
+        "z": {
+          "node": "router2",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:c6:64:7c",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "router1",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:68:72:38",
+          "peer": "z"
+        },
+        "z": {
+          "node": "router3",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:fb:31:86",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "router2",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:db:a5:83",
+          "peer": "z"
+        },
+        "z": {
+          "node": "router3",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:2e:b3:4e",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "router2",
+          "interface": "eth3",
+          "mac": "aa:c1:ab:e3:30:41",
+          "peer": "z"
+        },
+        "z": {
+          "node": "router4",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:6e:69:d4",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "router3",
+          "interface": "eth3",
+          "mac": "aa:c1:ab:e5:fc:9a",
+          "peer": "z"
+        },
+        "z": {
+          "node": "router4",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:13:53:82",
+          "peer": "a"
+        }
+      }
+    }
+  ]
+}
