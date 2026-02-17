@@ -9,7 +9,7 @@ This repository contains the virtualized BGP/IP testbed using Docker, Containerl
 - Containerlab
 - VS Code
 
-## Quick Start - Two Router Setup
+## Setup of the Topology using FRRouting
 
 ### 1. Deploy the Topology
 ```bash
@@ -27,22 +27,22 @@ sudo containerlab inspect -t topologies/lab.clab.yaml
 
 #### Check BGP Neighbors
 ```bash
-# On routerX (select X as the explicit router you want to observe)
-docker exec -it clab-bgp-testbed-routerX vtysh -c 'show ip bgp summary'
+# On router1
+docker exec -it clab-bgp-testbed-router1 vtysh -c 'show ip bgp summary'
 ```
 
 #### View BGP Routes
 ```bash
-# On routerX (again, select X as the explicit router). It only shows the best routes from the origin's neighbors to the target router. 
-docker exec -it clab-bgp-testbed-routerX vtysh -c 'show ip bgp'
+# On router1. It only shows the best routes from the origin's neighbors to the target router. 
+docker exec -it clab-bgp-testbed-router1 vtysh -c 'show ip bgp'
 ```
 
 #### Test Connectivity
 
 **Test BGP routes (using loopback IPs):**
 ```bash
-# Ping routerY's loopback from routerX using RouterX's loopback as source (X is the origin router, Y the target router). This is used to show you the exact route with the hops that were taken
-docker exec clab-bgp-testbed-router1 ping 192.168.Y.1 -I 192.168.X.1 -c 4
+# Ping router4's loopback from router3 using Router3's loopback as source (3 is the origin router, 4 the target router). This is used to show you the exact route with the hops that were taken
+docker exec clab-bgp-testbed-router1 ping 192.168.4.1 -I 192.168.3.1 -c 4
 ```
 
 **Quick connectivity test (Docker management network):**
@@ -55,8 +55,8 @@ docker exec clab-bgp-testbed-router1 ping router4 -c 4
 
 ### 4. Interactive Shell. This is useful if you want to focus on one router in particular and run commands easier
 ```bash
-# routerX, where X is the router you want to inspect
-docker exec -it clab-bgp-testbed-routerX vtysh
+# router1
+docker exec -it clab-bgp-testbed-router1 vtysh
 ```
 Now you can run the commands like this and inspect the outcome:
 ```bash
@@ -116,3 +116,52 @@ The address that is assigned to the router. In the current setup you ping this a
 ```bash
 In the final part, we define the specific information that we want our neighbors to know. This includes things like identifying the router in bgp, announcing the network to the neighbors, enabling neighbors for route exchange
 ```
+
+## Simulation of Censorship using ExaBGP
+
+Problem: BGP has no implemented authentication of prefixes, which allows sub-prefix hijacking in the first place
+
+We implement sub-prefix hijacking where the censor announces a more specific prefix than the legitimate network:
+
+- Legitimate announcement: Router1 announces `192.168.1.0/24`
+- Hijacked announcement: ExaBGP censor announces `192.168.1.0/25`
+
+Result: Due to longest-prefix matching in IP routing, the /25 announcement wins and traffic is routed to the censor (blackhole). If for example define the packet destination 192.168.1.10, instead of taking the direct route to the 192.168.1.0/24 network (192-168.1.0 - 192.168.1.255), the packet takes the route to the censor which defines a more specific prefix (192.168.1.0 - 192.168.1.127), of which the packet is part. In BGP, the more specific prefix always wins.
+
+### Configuration Files
+
+- `configs/Dockerfile.exabgp` Makes the image (building plan) for the docker files. With the frrouting docker containers, the image is given by frrouting, while for the exabgp docker containers, the image or content of the docker files is defined in this file.
+- `configs/exabgp-censor.conf` Defines what the censor tells to who
+- `configs/frr2.conf` Router2 with connection to censor, doesn't change the structure of the files
+- `topologies/lab.clab.yaml` ExaBGP container definition
+
+### Testing the Censorship
+
+#### 1. Verify ExaBGP is Running
+```bash
+# You should see "connected to peer-1 with outgoing-1 10.0.5.2-10.0.5.1". This means that the connection between the censor and router2 is successfully established.
+sudo docker logs clab-bgp-testbed-exabgp-censor
+```
+
+#### 2. Check BGP Session
+```bash
+# You can see that the censor AS 65999 is also part of the neighbors of router 2
+sudo docker exec -it clab-bgp-testbed-router2 vtysh -c "show ip bgp summary"
+```
+
+#### 3. Verify Route Hijacking
+```bash
+# Shows routes from router3 to the network 192.168.1.0/25. This shows you, if the BGP-session to the censor works.
+sudo docker exec -it clab-bgp-testbed-router3 vtysh -c "show ip bgp 192.168.1.0/25"
+```
+
+#### 4. Test Blackhole Effect
+```bash
+# Now we really want to test, if the censor does its work by redirecting the sent packets to a deadend and are lost, not reaching its intended destination. You should see 100% packet loss.
+sudo docker exec clab-bgp-testbed-router3 ping 192.168.1.10 -I 192.168.3.1 -c 4
+```
+
+
+In the future I want to test additional hijacking techniques
+
+

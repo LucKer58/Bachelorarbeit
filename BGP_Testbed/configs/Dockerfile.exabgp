@@ -1,0 +1,11 @@
+FROM python:3.11-alpine
+
+# install ExaBGP Version 4.2.25, had issues with version 5
+RUN pip3 install --no-cache-dir exabgp==4.2.25
+
+WORKDIR /root
+
+ENV exabgp.daemon.daemonize=false \
+    exabgp.log.level=INFO
+
+CMD ["exabgp", "/root/exabgp.conf"]
