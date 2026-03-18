@@ -42,7 +42,7 @@ docker exec -it clab-bgp-testbed-router1 vtysh -c 'show ip bgp'
 **Test BGP routes (using loopback IPs):**
 ```bash
 # Ping router4's loopback from router3 using Router3's loopback as source (3 is the origin router, 4 the target router). This is used to show you the exact route with the hops that were taken
-docker exec clab-bgp-testbed-router1 ping 192.168.4.1 -I 192.168.3.1 -c 4
+docker exec clab-bgp-testbed-router3 ping 192.168.4.1 -I 192.168.3.1 -c 4
 ```
 
 **Quick connectivity test (Docker management network):**
@@ -85,6 +85,8 @@ localhost:50080
 - sudo containerlab destroy -t topologies/lab.clab.yaml
 - sudo containerlab deploy -t topologies/lab.clab.yaml --reconfigure
 ```
+docker ps
+docker stop (id)
 
 ## File Structure
 
@@ -131,7 +133,7 @@ Result: Due to longest-prefix matching in IP routing, the /25 announcement wins 
 ### Configuration Files
 
 - `configs/Dockerfile.exabgp` Makes the image (building plan) for the docker files. With the frrouting docker containers, the image is given by frrouting, while for the exabgp docker containers, the image or content of the docker files is defined in this file.
-- `configs/exabgp-censor.conf` Defines what the censor tells to who
+- `configs/exabgp-censor.conf` Defines what the censor tells to who. The structure can be found under this link: https://github.com/Exa-Networks/exabgp/blob/main/etc/exabgp/conf-ipself4.conf It is similar, except that we focus on eBGP instead of iBGP
 - `configs/frr2.conf` Router2 with connection to censor, doesn't change the structure of the files
 - `topologies/lab.clab.yaml` ExaBGP container definition
 

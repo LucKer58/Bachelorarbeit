@@ -1,0 +1,52 @@
+name: bgp-testbed-openbgp
+
+topology:
+  nodes:
+    router1:
+      kind: linux
+      image: osrg/gobgp:latest
+      binds:
+        - ../configs/gobgp1.conf:/etc/gobgp/gobgp.conf
+        - ../configs/start-gobgp1.sh:/start.sh
+      entrypoint: /bin/bash /start.sh
+        
+    router2:
+      kind: linux
+      image: osrg/gobgp:latest
+      binds:
+        - ../configs/gobgp2.conf:/etc/gobgp/gobgp.conf
+        - ../configs/start-gobgp2.sh:/start.sh
+      entrypoint: /bin/bash /start.sh
+        
+    router3:
+      kind: linux
+      image: osrg/gobgp:latest
+      binds:
+        - ../configs/gobgp3.conf:/etc/gobgp/gobgp.conf
+        - ../configs/start-gobgp3.sh:/start.sh
+      entrypoint: /bin/bash /start.sh
+        
+    router4:
+      kind: linux
+      image: osrg/gobgp:latest
+      binds:
+        - ../configs/gobgp4.conf:/etc/gobgp/gobgp.conf
+        - ../configs/start-gobgp4.sh:/start.sh
+      entrypoint: /bin/bash /start.sh
+    
+    exabgp-censor:
+      kind: linux
+      image: exabgp-censor:latest
+      binds:
+        - ../configs/exabgp-censor.conf:/root/exabgp.conf
+      exec:
+        - ip addr add 10.0.5.2/30 dev eth1
+        - ip link set dev eth1 up
+
+  links:
+    - endpoints: ["router1:eth1", "router2:eth1"]
+    - endpoints: ["router1:eth2", "router3:eth1"]
+    - endpoints: ["router2:eth2", "router3:eth2"]
+    - endpoints: ["router2:eth3", "router4:eth1"]
+    - endpoints: ["router3:eth3", "router4:eth2"]
+    - endpoints: ["router2:eth4", "exabgp-censor:eth1"]
