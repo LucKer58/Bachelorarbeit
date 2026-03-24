@@ -13,14 +13,14 @@ This repository contains the virtualized BGP/IP testbed using Docker, Containerl
 
 ### 1. Deploy the Topology
 ```bash
-cd /mnt/c/Dev/Bachelorarbeit/BGP_Testbed
-sudo containerlab deploy -t topologies/lab.clab.yaml
+cd /mnt/c/Dev/Bachelorarbeit/BGP_Testbed/...
+sudo containerlab deploy -t lab.clab.yaml
 ```
 
 ### 2. Verify Deployment
 ```bash
 # Check containers are running
-sudo containerlab inspect -t topologies/lab.clab.yaml
+sudo containerlab inspect -t lab.clab.yaml
 ```
 
 ### 3. Observe BGP Status
@@ -73,7 +73,7 @@ Now you can run the commands like this and inspect the outcome:
 ### 5. View topology as graph
 ```bash
 # Run the following command
-sudo containerlab graph -t topologies/lab.clab.yaml
+sudo containerlab graph -t lab.clab.yaml
 ```
 ```bash
 # Enter the following in your browser to view the topology
@@ -82,8 +82,8 @@ localhost:50080
 
 ### 6. Cleanup or Redeploy
 ```bash
-- sudo containerlab destroy -t topologies/lab.clab.yaml
-- sudo containerlab deploy -t topologies/lab.clab.yaml --reconfigure
+- sudo containerlab destroy -t lab.clab.yaml
+- sudo containerlab deploy -t lab.clab.yaml --reconfigure
 ```
 docker ps
 docker stop (id)

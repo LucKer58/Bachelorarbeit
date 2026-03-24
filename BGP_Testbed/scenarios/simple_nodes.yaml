@@ -6,33 +6,33 @@ name: bgp-testbed
 # ========== ROUTER ==========
 # Nur Namen angeben - alles andere wird automatisch berechnet
 routers:
-  - router1
-  - router2
-  - router3
-  - router4
-  - router5
+- router1
+- router2
+- router3
+- router4
+- router5
 
 # ========== LINKS ==========
 # Einfach angeben welche Router verbunden sind
 links:
-  - [router1, router2]
-  - [router1, router3]
-  - [router2, router3]
-  - [router2, router4]
-  - [router3, router4]
-  - [router2, censor1]
-  - [router3, censor2]
-  - [router4, router5]
+- [router1, router2]
+- [router1, router3]
+- [router2, router3]
+- [router2, router4]
+- [router3, router4]
+- [router2, censor1]
+- [router3, censor2]
+- [router4, router5]
 
 
 # ========== ZENSOREN ==========
 # ExaBGP-basierte Angreifer
 censors:
-  - name: censor1
-    target_router: router1
-    attack_type: subprefix_hijack
+- name: censor1
+  target_router: router1
+  attack_type: subprefix_hijack
 
-  - name: censor2
-    target_router: router5
-    attack_type: exact_prefix_hijack
+- name: censor2
+  target_router: router5
+  attack_type: exact_prefix_hijack
 
