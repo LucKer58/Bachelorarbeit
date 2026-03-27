@@ -11,6 +11,7 @@ routers:
 - router3
 - router4
 - router5
+- router6
 
 # ========== LINKS ==========
 # Einfach angeben welche Router verbunden sind
@@ -23,6 +24,8 @@ links:
 - [router2, censor1]
 - [router3, censor2]
 - [router4, router5]
+- [router2, router6]
+- [router4, router6]
 
 
 # ========== ZENSOREN ==========
@@ -35,4 +38,12 @@ censors:
 - name: censor2
   target_router: router5
   attack_type: exact_prefix_hijack
+
+# ========== POLICIES ==========
+# Policies für BGP Attribute wie Local Preference (optional)
+policies:
+- node: router3
+  neighbor: router4
+  target_node: router6
+  local_preference: 300
 

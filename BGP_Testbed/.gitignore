@@ -4,12 +4,19 @@
 *.tar
 nodes/
 
+# Containerlab generierter Ordner ignorieren
+clab-bgp-testbed/*
+# Aber topology-data.json explizit ausschliessen (nicht ignorieren)
+!clab-bgp-testbed/topology-data.json
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 venv/
 .env
+clab-bgp-testbed/
+clab-bgp-testbed-t
 
 # Betriebssystem
 .DS_Store

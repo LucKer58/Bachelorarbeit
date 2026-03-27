@@ -2,6 +2,10 @@ import yaml
 import os
 import shutil
 
+# Wechsle in das Verzeichnis BGP_Testbed, in dem sich die Ordner 'scenarios' und 'generated' befinden
+bash_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(bash_dir)
+
 def attack_subprefix_hijack(target_num, local_ip, **kwargs):
     """Sub-Prefix Hijacking: /25 instead of /24 (more specific)"""
     prefix = f"192.168.{target_num}.0/25"
@@ -40,6 +44,7 @@ with open('scenarios/simple_nodes.yaml', 'r') as f:
 routers = data['routers']  # ['router1', 'router2', 'router3', 'router4']
 censors = data.get('censors', [])  # [{'name': 'censor1', 'target_router': 'router1', ...}]
 links = data['links']  # [['router1', 'router2'], ...]
+policies = data.get('policies', [])
 
 all_nodes = routers + [c['name'] for c in censors]
 
@@ -135,9 +140,12 @@ with open('generated/lab.clab.yaml', 'w') as f:
 
 
 # ========== 2. ROUTER CONFIGS ==========
+from collections import defaultdict
+
 for router in routers:
     num = int(router.replace('router', ''))
     router_connections = connections[router]
+    my_policies = [p for p in policies if p['node'] == router]
     
     config = f"""frr defaults traditional
 !
@@ -156,6 +164,50 @@ interface {conn['interface']}
 interface lo
  ip address 192.168.{num}.1/24
 !"""
+    
+    # Policies
+    policies_by_neighbor = defaultdict(list)
+    for p in my_policies:
+        policies_by_neighbor[p['neighbor']].append(p)
+
+    prefix_lists = ""
+    route_maps = ""
+    neighbor_route_maps = {}
+
+    for neighbor, pols in policies_by_neighbor.items():
+        rmap_name = f"RM-IN-{neighbor.upper()}"
+        seq = 10
+        neighbor_ip = next((c['neighbor_ip'] for c in router_connections if c['neighbor'] == neighbor), None)
+        if not neighbor_ip: continue
+        
+        neighbor_route_maps[neighbor_ip] = rmap_name
+        
+        for p in pols:
+            target = p['target_node']
+            lp = p['local_preference']
+            target_num = int(target.replace('router', ''))
+            plist_name = f"PFX-{target.upper()}"
+            
+            if f"ip prefix-list {plist_name}" not in prefix_lists:
+                 prefix_lists += f"""
+ip prefix-list {plist_name} seq 5 permit 192.168.{target_num}.0/24
+!"""
+            
+            route_maps += f"""
+route-map {rmap_name} permit {seq}
+ match ip address prefix-list {plist_name}
+ set local-preference {lp}
+!"""
+            seq += 10
+            
+        route_maps += f"""
+route-map {rmap_name} permit {seq}
+!"""
+
+    if prefix_lists:
+        config += prefix_lists
+    if route_maps:
+        config += route_maps
     
     # BGP
     config += f"""
@@ -178,6 +230,7 @@ router bgp 6500{num}
     
     # Address family
     config += f"""
+ !
  address-family ipv4 unicast
   network 192.168.{num}.0/24"""
     
@@ -185,8 +238,14 @@ router bgp 6500{num}
         config += f"""
   neighbor {conn['neighbor_ip']} activate"""
     
+    # Route-map assignment
+    for nip, rmap in neighbor_route_maps.items():
+        config += f"""
+  neighbor {nip} route-map {rmap} in"""
+
     config += """
  exit-address-family
+!
 !
 """
     
