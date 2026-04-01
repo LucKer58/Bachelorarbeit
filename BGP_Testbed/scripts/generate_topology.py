@@ -6,34 +6,6 @@ import shutil
 bash_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(bash_dir)
 
-def attack_subprefix_hijack(target_num, local_ip, **kwargs):
-    """Sub-Prefix Hijacking: /25 instead of /24 (more specific)"""
-    prefix = f"192.168.{target_num}.0/25"
-    return f"        route {prefix} next-hop {local_ip};"
-
-def attack_exact_prefix_hijack(target_num, local_ip, **kwargs):
-    """Exact-Prefix Hijacking: same /24"""
-    prefix = f"192.168.{target_num}.0/24"
-    return f"        route {prefix} next-hop {local_ip};"
-
-def attack_as_path_prepending(target_num, local_ip, censor_asn, prepend_count=3, **kwargs):
-    """AS-Path Prepending: make path artificially longer"""
-    prefix = f"192.168.{target_num}.0/24"
-    prepend = " ".join([str(censor_asn)] * prepend_count)
-    return f"        route {prefix} next-hop {local_ip} as-path [ {prepend} ];"
-
-def attack_blackhole(target_num, local_ip, community="65535:666", **kwargs):
-    """Blackhole with Community Tag"""
-    prefix = f"192.168.{target_num}.0/24"
-    return f"        route {prefix} next-hop {local_ip} community [ {community} ];"
-
-ATTACK_HANDLERS = {
-    'subprefix_hijack': attack_subprefix_hijack,
-    'exact_prefix_hijack': attack_exact_prefix_hijack,
-    'as_path_prepending': attack_as_path_prepending,
-    'blackhole': attack_blackhole,
-}
-
 if os.path.exists('generated'):
     shutil.rmtree('generated')
 os.makedirs('generated/configs', exist_ok=True)
@@ -110,26 +82,18 @@ for router in routers:
         ]
     }
 
-# CENSOR NODES (SEPARAT!)
+# CENSOR NODES (FRR)
 for censor in censors:
     censor_name = censor['name']
     
-    # Erste IP des Zensors finden
-    censor_ip = connections[censor_name][0]['ip'] if connections[censor_name] else None
-    
     topology['topology']['nodes'][censor_name] = {
         'kind': 'linux',
-        'image': 'exabgp-censor:latest',
+        'image': 'frrouting/frr:latest',
         'binds': [
-            f'./configs/{censor_name}.conf:/root/exabgp.conf'
+            f'./configs/{censor_name}.conf:/etc/frr/frr.conf',
+            '../configs/daemons:/etc/frr/daemons'
         ]
     }
-    
-    if censor_ip:
-        topology['topology']['nodes'][censor_name]['exec'] = [
-            f'ip addr add {censor_ip} dev eth1',
-            'ip link set dev eth1 up'
-        ]
 
 # LINKS
 topology['topology']['links'] = link_details
@@ -262,44 +226,111 @@ for censor in censors:
     target_num = int(target_router.replace('router', ''))
     attack_type = censor['attack_type']
     
-    # Neighbor-Info
-    neighbor_info = connections[censor_name][0]
-    local_ip = neighbor_info['ip'].split('/')[0]
-    neighbor_ip = neighbor_info['neighbor_ip']
-    neighbor_name = neighbor_info['neighbor']
-    neighbor_asn = 65000 + int(neighbor_name.replace('router', ''))
+    censor_connections = connections[censor_name]
     censor_asn = 65900 + censor_num
     
-    # Get attack handler
-    handler = ATTACK_HANDLERS.get(attack_type)
-    if handler:
-        attack_params = {
-            'target_num': target_num,
-            'local_ip': local_ip,
-            'censor_asn': censor_asn,
-            'prepend_count': censor.get('prepend_count', 3),
-            'community': censor.get('community', '65535:666')
-        }
-        static_route = handler(**attack_params)
+    config = f"""frr defaults traditional
+!
+hostname {censor_name}
+!"""
+
+    for conn in censor_connections:
+        config += f"""
+interface {conn['interface']}
+ ip address {conn['ip']}
+!"""
+    
+    # Loopback
+    config += f"""
+interface lo
+ ip address 10.255.255.{censor_num}/32
+!"""
+
+    # Static routes for hijacked prefixes
+    static_routes = ""
+    networks = ""
+    route_maps = ""
+    attack_rmap_name = f"RM-ATTACK-{attack_type.upper()}"
+    has_rmap = False
+    
+    if attack_type == 'subprefix_hijack':
+        prefix = f"192.168.{target_num}.0/25"
+        static_routes += f"ip route {prefix} blackhole\n"
+        networks += f"  network {prefix}\n"
+    elif attack_type == 'exact_prefix_hijack':
+        prefix = f"192.168.{target_num}.0/24"
+        static_routes += f"ip route {prefix} blackhole\n"
+        networks += f"  network {prefix}\n"
+    elif attack_type == 'as_path_prepending':
+        prefix = f"192.168.{target_num}.0/24"
+        static_routes += f"ip route {prefix} blackhole\n"
+        prepend_count = censor.get('prepend_count', 3)
+        prepend = " ".join([str(censor_asn)] * prepend_count)
+        networks += f"  network {prefix} route-map {attack_rmap_name}\n"
+        route_maps += f"""route-map {attack_rmap_name} permit 10
+ set as-path prepend {prepend}
+!
+"""
+        has_rmap = True
+    elif attack_type == 'blackhole':
+        prefix = f"192.168.{target_num}.0/24"
+        static_routes += f"ip route {prefix} blackhole\n"
+        community = censor.get('community', '65535:666')
+        networks += f"  network {prefix} route-map {attack_rmap_name}\n"
+        route_maps += f"""route-map {attack_rmap_name} permit 10
+ set community {community}
+!
+"""
+        has_rmap = True
     else:
-        print(f"WARNING: Unknown attack type '{attack_type}', using default subprefix hijack")
-        static_route = f"        route 192.168.{target_num}.0/25 next-hop {local_ip};"
+        print(f"WARNING: Unknown attack type '{attack_type}', using default exact prefix hijack")
+        prefix = f"192.168.{target_num}.0/24"
+        static_routes += f"ip route {prefix} blackhole\n"
+        networks += f"  network {prefix}\n"
+
+    if static_routes:
+        config += f"\n{static_routes.strip()}"
+    if route_maps:
+        config += f"\n!\n{route_maps.strip()}"
+
+    # BGP
+    config += f"""
+!
+router bgp {censor_asn}
+ bgp router-id 9{censor_num}.9{censor_num}.9{censor_num}.9{censor_num}
+ no bgp ebgp-requires-policy"""
+
+    # Neighbors
+    for conn in censor_connections:
+        neighbor = conn['neighbor']
+        if neighbor.startswith('router'):
+            neighbor_asn = 65000 + int(neighbor.replace('router', ''))
+        elif neighbor.startswith('censor'):
+            neighbor_asn = 65900 + int(neighbor.replace('censor', ''))
+        config += f"""
+ neighbor {conn['neighbor_ip']} remote-as {neighbor_asn}"""
+
+    # Address family
+    config += f"""
+ !
+ address-family ipv4 unicast"""
+    if networks:
+        config += "\n" + networks.rstrip()
     
-    config = f"""neighbor {neighbor_ip} {{
-    router-id 9{censor_num}.9{censor_num}.9{censor_num}.9{censor_num};
-    local-address {local_ip};
-    local-as {censor_asn};
-    peer-as {neighbor_asn};
-    hold-time 180;
-    
-    family {{
-        ipv4 unicast;
-    }}
-    
-    static {{
-{static_route}
-    }}
-}}
+    for conn in censor_connections:
+        if has_rmap and attack_type in ['as_path_prepending', 'blackhole'] and False: # Apply to network, not neighbor
+            pass
+        config += f"""
+  neighbor {conn['neighbor_ip']} activate"""
+        # If we wanted to send community, we need `neighbor X.X.X.X send-community both`
+        if attack_type == 'blackhole':
+            config += f"""
+  neighbor {conn['neighbor_ip']} send-community both"""
+
+    config += """
+ exit-address-family
+!
+!
 """
     
     # Schreiben

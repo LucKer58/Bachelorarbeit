@@ -44,6 +44,6 @@ censors:
 policies:
 - node: router3
   neighbor: router4
-  target_node: router6
+  target_node: router5
   local_preference: 300
 

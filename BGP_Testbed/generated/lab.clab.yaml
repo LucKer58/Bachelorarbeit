@@ -39,20 +39,16 @@ topology:
       - ../configs/daemons:/etc/frr/daemons
     censor1:
       kind: linux
-      image: exabgp-censor:latest
+      image: frrouting/frr:latest
       binds:
-      - ./configs/censor1.conf:/root/exabgp.conf
-      exec:
-      - ip addr add 10.0.5.2/30 dev eth1
-      - ip link set dev eth1 up
+      - ./configs/censor1.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
     censor2:
       kind: linux
-      image: exabgp-censor:latest
+      image: frrouting/frr:latest
       binds:
-      - ./configs/censor2.conf:/root/exabgp.conf
-      exec:
-      - ip addr add 10.0.6.2/30 dev eth1
-      - ip link set dev eth1 up
+      - ./configs/censor2.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
   links:
   - endpoints:
     - router1:eth1
