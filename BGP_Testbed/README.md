@@ -84,6 +84,8 @@ localhost:50080
 ```bash
 - sudo containerlab destroy -t lab.clab.yaml
 - sudo containerlab deploy -t lab.clab.yaml --reconfigure
+- containerlab destroy -t lab.clab.yaml && containerlab deploy -t lab.clab.yaml
+- sudo docker rm -f $(sudo docker ps -a -q --filter "label=containerlab=bgp-testbed")
 ```
 docker ps
 docker stop (id)
