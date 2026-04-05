@@ -31,6 +31,11 @@ sudo containerlab inspect -t lab.clab.yaml
 docker exec -it clab-bgp-testbed-router1 vtysh -c 'show ip bgp summary'
 ```
 
+#### Check route of packets
+```bash
+docker exec clab-bgp-testbed-router3 traceroute 192.168.1.1 -s 192.168.3.1
+```
+
 #### View BGP Routes
 ```bash
 # On router1. It only shows the best routes from the origin's neighbors to the target router. 
