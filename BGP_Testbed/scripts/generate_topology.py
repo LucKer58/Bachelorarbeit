@@ -148,7 +148,6 @@ interface lo
         
         for p in pols:
             target = p['target_node']
-            lp = p['local_preference']
             target_num = int(target.replace('router', ''))
             plist_name = f"PFX-{target.upper()}"
             
@@ -159,9 +158,17 @@ ip prefix-list {plist_name} seq 5 permit 192.168.{target_num}.0/24
             
             route_maps += f"""
 route-map {rmap_name} permit {seq}
- match ip address prefix-list {plist_name}
- set local-preference {lp}
-!"""
+ match ip address prefix-list {plist_name}"""
+            
+            if 'local_preference' in p:
+                route_maps += f"\n set local-preference {p['local_preference']}"
+            
+            if 'prepend_asn' in p:
+                prepend_count = p.get('prepend_count', 3)
+                prepend = " ".join([str(p['prepend_asn'])] * prepend_count)
+                route_maps += f"\n set as-path prepend {prepend}"
+                
+            route_maps += "\n!\n"
             seq += 10
             
         route_maps += f"""
@@ -257,18 +264,40 @@ interface lo
         prefix = f"192.168.{target_num}.0/25"
         static_routes += f"ip route {prefix} blackhole\n"
         networks += f"  network {prefix}\n"
+    elif attack_type == 'as_path_poisoning':
+        # Kombiniert Subprefix Hijack (/25) mit Path Poisoning (Leak Prevention)
+        prefix = f"192.168.{target_num}.0/25"
+        static_routes += f"ip route {prefix} blackhole\n"
+        poison_asn = censor.get('poison_asn', 65000 + target_num)
+        networks += f"  network {prefix} route-map {attack_rmap_name}\n"
+        route_maps += f"""route-map {attack_rmap_name} permit 10
+ set as-path prepend {poison_asn}
+!
+"""
+        has_rmap = True
     elif attack_type == 'exact_prefix_hijack':
         prefix = f"192.168.{target_num}.0/24"
         static_routes += f"ip route {prefix} blackhole\n"
         networks += f"  network {prefix}\n"
-    elif attack_type == 'as_path_prepending':
+    elif attack_type == 'as_path_forgery':
+        # Täuscht vor, dass die Route über einen bestimmten Pfad geht (z.B. vertrauenswürdige ASNs)
         prefix = f"192.168.{target_num}.0/24"
         static_routes += f"ip route {prefix} blackhole\n"
-        prepend_count = censor.get('prepend_count', 3)
-        prepend = " ".join([str(censor_asn)] * prepend_count)
+        fake_path = censor.get('fake_path', '65003 65004')
         networks += f"  network {prefix} route-map {attack_rmap_name}\n"
         route_maps += f"""route-map {attack_rmap_name} permit 10
- set as-path prepend {prepend}
+ set as-path prepend {fake_path}
+!
+"""
+        has_rmap = True
+    elif attack_type == 'origin_spoofing':
+        # Fälscht gezielt die Origin-ASN (die letzte ASN im Pfad) auf die echte ASN des Ziels, um RPKI (Route Origin Validation) zu umgehen.
+        prefix = f"192.168.{target_num}.0/24"
+        static_routes += f"ip route {prefix} blackhole\n"
+        target_asn = 65000 + target_num
+        networks += f"  network {prefix} route-map {attack_rmap_name}\n"
+        route_maps += f"""route-map {attack_rmap_name} permit 10
+ set as-path prepend {target_asn}
 !
 """
         has_rmap = True
