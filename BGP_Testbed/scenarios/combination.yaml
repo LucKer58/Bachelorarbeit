@@ -1,0 +1,55 @@
+# Vereinfachte Topologie-Definition
+# Das Script berechnet alles automatisch basierend auf Router-Namen
+
+name: bgp-testbed
+
+# ========== ROUTER ==========
+# Nur Namen angeben - alles andere wird automatisch berechnet
+routers:
+- router1
+- router2
+- router3
+- router4
+- router5
+- router6
+
+# ========== LINKS ==========
+# Einfach angeben welche Router verbunden sind
+links:
+- [router1, router2]
+- [router1, router3]
+- [router2, router3]
+- [router2, router4]
+- [router3, router4]
+- [router2, censor1]
+- [router3, censor2]
+- [router4, router5]
+- [router2, router6]
+- [router4, router6]
+
+
+# ========== ZENSOREN ==========
+# ExaBGP-basierte Angreifer
+censors:
+- name: censor1
+  target_router: router1
+  attack_type: subprefix_hijack
+
+- name: censor2
+  target_router: router5
+  attack_type: exact_prefix_hijack
+
+# ========== POLICIES ==========
+# Policies für BGP Attribute wie Local Preference (optional)
+policies:
+- node: router3
+  neighbor: censor2
+  target_node: router5
+  prepend_asn: 65902
+  prepend_count: 3
+
+- node: router3
+  neighbor: router4
+  target_node: router6
+  local_preference: 300
+
