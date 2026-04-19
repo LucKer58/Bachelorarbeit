@@ -15,6 +15,7 @@ with open('scenarios/simple_nodes.yaml', 'r') as f:
 
 routers = data['routers']  # ['router1', 'router2', 'router3', 'router4']
 censors = data.get('censors', [])  # [{'name': 'censor1', 'target_router': 'router1', ...}]
+rpki_routers = data.get('rpki_routers', [])  # Neu: Router, die RPKI nutzen sollen
 links = data['links']  # [['router1', 'router2'], ...]
 policies = data.get('policies', [])
 
@@ -95,12 +96,38 @@ for censor in censors:
         ]
     }
 
+# RPKI VALIDATOR (GoRTR)
+if rpki_routers:
+    topology['topology']['nodes']['rpki-validator'] = {
+        'kind': 'linux',
+        'image': 'cloudflare/gortr',
+        'cmd': '-bind :3323 -cache /roas.json -verify=false -checktime=false',
+        'binds': [
+            './configs/roas.json:/roas.json:ro'
+        ]
+    }
+
 # LINKS
 topology['topology']['links'] = link_details
 
 # Schreiben
 with open('generated/lab.clab.yaml', 'w') as f:
     yaml.dump(topology, f, default_flow_style=False, sort_keys=False)
+
+# RPKI ROAs (JSON) generieren
+if rpki_routers:
+    import json
+    roas_data = {"roas": []}
+    for r in routers:
+        r_num = int(r.replace('router', ''))
+        roas_data["roas"].append({
+            "asn": f"AS6500{r_num}",
+            "prefix": f"192.168.{r_num}.0/24",
+            "maxLength": 24,
+            "ta": "Testbed"
+        })
+    with open('generated/configs/roas.json', 'w') as f:
+        json.dump(roas_data, f, indent=2)
 
 
 # ========== 2. ROUTER CONFIGS ==========
@@ -114,6 +141,14 @@ for router in routers:
     config = f"""frr defaults traditional
 !
 hostname {router}
+!"""
+    
+    if router in rpki_routers:
+        config += """
+rpki
+ rpki polling_period 10
+ rpki cache rpki-validator 3323 preference 1
+ exit
 !"""
     
     # Interfaces
@@ -175,6 +210,22 @@ route-map {rmap_name} permit {seq}
 route-map {rmap_name} permit {seq}
 !"""
 
+    if router in rpki_routers:
+        # Standard-Routemap für RPKI (falls keine spezifischen Policies existieren)
+        rpki_route_maps = f"""
+route-map RM-RPKI-IN deny 10
+ match rpki invalid
+!
+route-map RM-RPKI-IN permit 20
+!"""
+        # Inject RPKI deny rule into all existing policy route-maps
+        for rmap in set(neighbor_route_maps.values()):
+            rpki_route_maps += f"""
+route-map {rmap} deny 5
+ match rpki invalid
+!"""
+        route_maps = rpki_route_maps + route_maps
+
     if prefix_lists:
         config += prefix_lists
     if route_maps:
@@ -213,6 +264,12 @@ router bgp 6500{num}
     for nip, rmap in neighbor_route_maps.items():
         config += f"""
   neighbor {nip} route-map {rmap} in"""
+
+    if router in rpki_routers:
+        for conn in router_connections:
+            if conn['neighbor_ip'] not in neighbor_route_maps:
+                config += f"""
+  neighbor {conn['neighbor_ip']} route-map RM-RPKI-IN in"""
 
     config += """
  exit-address-family

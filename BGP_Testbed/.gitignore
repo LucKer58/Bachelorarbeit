@@ -18,6 +18,9 @@ venv/
 clab-bgp-testbed/
 clab-bgp-testbed-t
 
+# Spezifisch generierte Testbed-Dateien
+generated/configs/roas.json
+
 # Betriebssystem
 .DS_Store
 Thumbs.db

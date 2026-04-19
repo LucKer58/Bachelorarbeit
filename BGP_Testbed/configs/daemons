@@ -4,6 +4,8 @@
 bgpd=yes
 ospfd=no
 ospf6d=no
+
+# RPKI Option
 ripd=no
 ripngd=no
 isisd=no
@@ -20,5 +22,5 @@ vrrpd=no
 
 # Integrated config (all in one frr.conf file)
 vtysh_enable=yes
-zebra_options=" -s 90000000"
-bgpd_options="   -A 127.0.0.1"
+zebra_options=" -A 127.0.0.1 -s 90000000"
+bgpd_options=" -A 127.0.0.1 -M rpki"

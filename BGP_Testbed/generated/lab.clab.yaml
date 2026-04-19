@@ -25,6 +25,12 @@ topology:
       binds:
       - ./configs/censor1.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
+    rpki-validator:
+      kind: linux
+      image: cloudflare/gortr
+      cmd: -bind :3323 -cache /roas.json -verify=false -checktime=false
+      binds:
+      - ./configs/roas.json:/roas.json:ro
   links:
   - endpoints:
     - router1:eth1
