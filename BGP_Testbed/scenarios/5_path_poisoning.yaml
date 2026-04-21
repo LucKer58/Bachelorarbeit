@@ -20,5 +20,6 @@ censors:
 - name: censor1
   target_router: router3
   attack_type: as_path_poisoning
+  prefix_type: subprefix
   poison_asn: 65002    # Die ASN des Grenz-Routers (router2)
 

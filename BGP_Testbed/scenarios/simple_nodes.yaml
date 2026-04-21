@@ -9,12 +9,6 @@ routers:
 - router2
 - router3
 
-# ========== RPKI ROUTER ==========
-# Welche Router sollen Routen mittels RPKI validieren?
-rpki_routers:
-- router1
-- router2
-
 # ========== LINKS ==========
 links:
 - [router1, router2]   # Inland ist mit der Grenze verbunden
@@ -25,4 +19,7 @@ links:
 censors:
 - name: censor1
   target_router: router3
-  attack_type: subprefix_hijack
+  attack_type: as_path_poisoning
+  prefix_type: subprefix
+  poison_asn: 65002    # Die ASN des Grenz-Routers (router2)
+

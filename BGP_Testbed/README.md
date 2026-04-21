@@ -33,7 +33,8 @@ docker exec -it clab-bgp-testbed-router1 vtysh -c 'show ip bgp summary'
 
 #### Check route of packets
 ```bash
-docker exec clab-bgp-testbed-router3 traceroute 192.168.1.1 -s 192.168.3.1
+docker exec clab-bgp-testbed-router3 traceroute -s 192.168.3.1 192.168.1.1
+docker exec -it clab-bgp-testbed-router1 vtysh -c 'show ip route'
 ```
 
 #### View BGP Routes

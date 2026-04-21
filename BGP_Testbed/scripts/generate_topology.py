@@ -310,69 +310,65 @@ interface lo
  ip address 10.255.255.{censor_num}/32
 !"""
 
-    # Static routes for hijacked prefixes
+    # Static routes for hijacked prefixes und Modulare Angriffs-Logik
     static_routes = ""
     networks = ""
     route_maps = ""
     attack_rmap_name = f"RM-ATTACK-{attack_type.upper()}"
     has_rmap = False
     
-    if attack_type == 'subprefix_hijack':
+    # 1. PRÄFIX BESTIMMEN
+    # Wir erwarten entweder 'subprefix' oder 'exact' (Standard: 'exact').
+    # Die Angriffsart (attack_type) entscheidet NUR noch über die BGP-Attribute (Route-Maps).
+    prefix_type = censor.get('prefix_type', 'exact')
+            
+    if prefix_type == 'subprefix':
         prefix = f"192.168.{target_num}.0/25"
-        static_routes += f"ip route {prefix} blackhole\n"
-        networks += f"  network {prefix}\n"
-    elif attack_type == 'as_path_poisoning':
-        # Kombiniert Subprefix Hijack (/25) mit Path Poisoning (Leak Prevention)
-        prefix = f"192.168.{target_num}.0/25"
-        static_routes += f"ip route {prefix} blackhole\n"
-        poison_asn = censor.get('poison_asn', 65000 + target_num)
-        networks += f"  network {prefix} route-map {attack_rmap_name}\n"
-        route_maps += f"""route-map {attack_rmap_name} permit 10
- set as-path prepend {poison_asn}
-!
-"""
-        has_rmap = True
-    elif attack_type == 'exact_prefix_hijack':
-        prefix = f"192.168.{target_num}.0/24"
-        static_routes += f"ip route {prefix} blackhole\n"
-        networks += f"  network {prefix}\n"
-    elif attack_type == 'as_path_forgery':
-        # Täuscht vor, dass die Route über einen bestimmten Pfad geht (z.B. vertrauenswürdige ASNs)
-        prefix = f"192.168.{target_num}.0/24"
-        static_routes += f"ip route {prefix} blackhole\n"
-        fake_path = censor.get('fake_path', '65003 65004')
-        networks += f"  network {prefix} route-map {attack_rmap_name}\n"
-        route_maps += f"""route-map {attack_rmap_name} permit 10
- set as-path prepend {fake_path}
-!
-"""
-        has_rmap = True
-    elif attack_type == 'origin_spoofing':
-        # Fälscht gezielt die Origin-ASN (die letzte ASN im Pfad) auf die echte ASN des Ziels, um RPKI (Route Origin Validation) zu umgehen.
-        prefix = f"192.168.{target_num}.0/24"
-        static_routes += f"ip route {prefix} blackhole\n"
-        target_asn = 65000 + target_num
-        networks += f"  network {prefix} route-map {attack_rmap_name}\n"
-        route_maps += f"""route-map {attack_rmap_name} permit 10
- set as-path prepend {target_asn}
-!
-"""
-        has_rmap = True
-    elif attack_type == 'blackhole':
-        prefix = f"192.168.{target_num}.0/24"
-        static_routes += f"ip route {prefix} blackhole\n"
-        community = censor.get('community', '65535:666')
-        networks += f"  network {prefix} route-map {attack_rmap_name}\n"
-        route_maps += f"""route-map {attack_rmap_name} permit 10
- set community {community}
-!
-"""
-        has_rmap = True
     else:
-        print(f"WARNING: Unknown attack type '{attack_type}', using default exact prefix hijack")
         prefix = f"192.168.{target_num}.0/24"
+        
+    mitm_forward_node = censor.get('mitm_forward_node')
+    if attack_type == 'mitm' and mitm_forward_node:
+        # Finde die IP des Forward-Nodes für die statische Route
+        forward_ip = "blackhole"
+        for conn in censor_connections:
+            if conn['neighbor'] == mitm_forward_node:
+                forward_ip = conn['neighbor_ip']
+        if forward_ip != "blackhole":
+            static_routes += f"ip route {prefix} {forward_ip}\n"
+        else:
+            static_routes += f"ip route {prefix} blackhole\n"
+    else:
         static_routes += f"ip route {prefix} blackhole\n"
+
+    # 2. BGP-ATTRIBUTE MANIPULIEREN
+    # Standard-Hijacks ohne spezielle BGP-Attribute
+    if attack_type in ['hijack', 'mitm']:
+        # Kein spezielles BGP-Attribut, einfach nur ankündigen
         networks += f"  network {prefix}\n"
+    else:
+        # Route-Map für BGP-Manipulationen wird benötigt
+        networks += f"  network {prefix} route-map {attack_rmap_name}\n"
+        route_maps += f"route-map {attack_rmap_name} permit 10\n"
+        has_rmap = True
+        
+        if attack_type == 'as_path_poisoning':
+            poison_asn = censor.get('poison_asn', 65000 + target_num)
+            route_maps += f" set as-path prepend {poison_asn}\n"
+            
+        elif attack_type == 'as_path_forgery':
+            fake_path = censor.get('fake_path', f'65004 65003')
+            route_maps += f" set as-path prepend {fake_path}\n"
+            
+        elif attack_type == 'origin_spoofing':
+            target_asn = 65000 + target_num
+            route_maps += f" set as-path prepend {target_asn}\n"
+            
+        elif attack_type == 'blackhole':
+            community = censor.get('community', '65535:666')
+            route_maps += f" set community {community}\n"
+            
+        route_maps += "!\n"
 
     if static_routes:
         config += f"\n{static_routes.strip()}"
@@ -409,13 +405,37 @@ router bgp {censor_asn}
         config += f"""
   neighbor {conn['neighbor_ip']} activate"""
         # If we wanted to send community, we need `neighbor X.X.X.X send-community both`
-        if attack_type == 'blackhole':
+        if attack_type in ['blackhole', 'mitm']:
             config += f"""
   neighbor {conn['neighbor_ip']} send-community both"""
+
+        # Wenn der Zensor als MitM fungiert, darf er die manipulierte Fake-Route nicht seinem Forward-Node ankündigen!
+        if attack_type == 'mitm':
+            if mitm_forward_node == conn['neighbor']:
+                config += f"\n  neighbor {conn['neighbor_ip']} route-map RM-NO-MITM out\n"
+            else:
+                # An Opfer (router1) senden wir es MIT no-export, damit diese es nicht an den Transit-Router (router2) zurückwerfen!
+                config += f"\n  neighbor {conn['neighbor_ip']} route-map RM-MITM-VICTIM out\n"
 
     config += """
  exit-address-family
 !
+!
+"""
+    if attack_type == 'mitm':
+        config += f"""
+ip prefix-list PL-MITM seq 5 permit {prefix}
+!
+route-map RM-NO-MITM deny 10
+ match ip address prefix-list PL-MITM
+!
+route-map RM-NO-MITM permit 20
+!
+route-map RM-MITM-VICTIM permit 10
+ match ip address prefix-list PL-MITM
+ set community no-export
+!
+route-map RM-MITM-VICTIM permit 20
 !
 """
     

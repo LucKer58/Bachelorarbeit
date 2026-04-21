@@ -19,7 +19,8 @@ links:
 censors:
 - name: censor1
   target_router: router3
-  attack_type: exact_prefix_hijack
+  attack_type: hijack
+  prefix_type: exact
 
 # ========== POLICIES ==========
 policies:
