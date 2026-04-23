@@ -19,6 +19,12 @@ topology:
       binds:
       - ./configs/frr3.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
+    router4:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr4.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
     censor1:
       kind: linux
       image: frrouting/frr:latest
@@ -35,3 +41,6 @@ topology:
   - endpoints:
     - router1:eth2
     - censor1:eth1
+  - endpoints:
+    - router3:eth2
+    - router4:eth1

@@ -203,6 +203,9 @@ route-map {rmap_name} permit {seq}
                 prepend = " ".join([str(p['prepend_asn'])] * prepend_count)
                 route_maps += f"\n set as-path prepend {prepend}"
                 
+            if 'origin_code' in p:
+                route_maps += f"\n set origin {p['origin_code']}"
+                
             route_maps += "\n!\n"
             seq += 10
             
@@ -317,6 +320,55 @@ interface lo
     attack_rmap_name = f"RM-ATTACK-{attack_type.upper()}"
     has_rmap = False
     
+    my_censor_policies = [p for p in policies if p['node'] == censor_name]
+    policies_by_neighbor_censor = defaultdict(list)
+    for p in my_censor_policies:
+        policies_by_neighbor_censor[p['neighbor']].append(p)
+
+    censor_prefix_lists = ""
+    censor_in_route_maps = ""
+    censor_neighbor_in_rmaps = {}
+
+    for neighbor, pols in policies_by_neighbor_censor.items():
+        rmap_name = f"RM-IN-{neighbor.upper()}"
+        seq = 10
+        neighbor_ip = next((c['neighbor_ip'] for c in censor_connections if c['neighbor'] == neighbor), None)
+        if not neighbor_ip: continue
+        
+        censor_neighbor_in_rmaps[neighbor_ip] = rmap_name
+        
+        for p in pols:
+            target = p['target_node']
+            target_num = int(target.replace('router', ''))
+            plist_name = f"PFX-{target.upper()}"
+            
+            if f"ip prefix-list {plist_name}" not in censor_prefix_lists:
+                 censor_prefix_lists += f"""
+ip prefix-list {plist_name} seq 5 permit 192.168.{target_num}.0/24
+!"""
+            
+            censor_in_route_maps += f"""
+route-map {rmap_name} permit {seq}
+ match ip address prefix-list {plist_name}"""
+            
+            if 'local_preference' in p:
+                censor_in_route_maps += f"\n set local-preference {p['local_preference']}"
+            
+            if 'prepend_asn' in p:
+                prepend_count = p.get('prepend_count', 3)
+                prepend = " ".join([str(p['prepend_asn'])] * prepend_count)
+                censor_in_route_maps += f"\n set as-path prepend {prepend}"
+                
+            if 'origin_code' in p:
+                censor_in_route_maps += f"\n set origin {p['origin_code']}"
+                
+            censor_in_route_maps += "\n!\n"
+            seq += 10
+            
+        censor_in_route_maps += f"""
+route-map {rmap_name} permit {seq}
+!"""
+
     # 1. PRÄFIX BESTIMMEN
     # Wir erwarten entweder 'subprefix' oder 'exact' (Standard: 'exact').
     # Die Angriffsart (attack_type) entscheidet NUR noch über die BGP-Attribute (Route-Maps).
@@ -363,17 +415,23 @@ interface lo
         elif attack_type == 'origin_spoofing':
             target_asn = 65000 + target_num
             route_maps += f" set as-path prepend {target_asn}\n"
-            
+        elif attack_type == 'origin_code_manipulation':
+            origin_code = censor.get('origin_code', 'incomplete')
+            route_maps += f" set origin {origin_code}\n"
         elif attack_type == 'blackhole':
             community = censor.get('community', '65535:666')
             route_maps += f" set community {community}\n"
             
         route_maps += "!\n"
 
+    if censor_prefix_lists:
+        config += f"\n{censor_prefix_lists.strip()}"
     if static_routes:
         config += f"\n{static_routes.strip()}"
     if route_maps:
         config += f"\n!\n{route_maps.strip()}"
+    if censor_in_route_maps:
+        config += f"\n!\n{censor_in_route_maps.strip()}"
 
     # BGP
     config += f"""
@@ -404,6 +462,10 @@ router bgp {censor_asn}
             pass
         config += f"""
   neighbor {conn['neighbor_ip']} activate"""
+        if conn['neighbor_ip'] in censor_neighbor_in_rmaps:
+            rmap = censor_neighbor_in_rmaps[conn['neighbor_ip']]
+            config += f"\n  neighbor {conn['neighbor_ip']} route-map {rmap} in"
+            
         # If we wanted to send community, we need `neighbor X.X.X.X send-community both`
         if attack_type in ['blackhole', 'mitm']:
             config += f"""
