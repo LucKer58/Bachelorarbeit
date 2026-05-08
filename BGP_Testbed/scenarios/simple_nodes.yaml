@@ -1,37 +1,25 @@
 name: bgp-testbed
 
 # ========== ROUTER ==========
-# router1 = Opfer (Inland)
-# router2 = Transit
-# router3 = Ziel (Ausland)
+# router1 = Inlands-Router (Bürger des Landes)
+# router2 = Grenz-Router (Transit ins Ausland)
+# router3 = Ziel-Router im Ausland (Das Opfer, z.B. Twitter)
 routers:
 - router1
 - router2
 - router3
-- router4
 
 # ========== LINKS ==========
 links:
-- [router1, router2]
-- [router2, router3]
-- [router1, censor1]
-- [router3, router4]
+- [router1, router2]   # Inland ist mit der Grenze verbunden
+- [router2, router3]   # Grenze ist mit dem Ausland verbunden
+- [router1, censor1]   # Zensor hängt am Inlands-Router
 
 # ========== ZENSOREN ==========
 censors:
 - name: censor1
-  target_router: router4
-  attack_type: hijack
-  prefix_type: exact
+  target_router: router3
+  attack_type: as_path_poisoning
+  prefix_type: subprefix
+  poison_asn: 65002    # Die ASN des Grenz-Routers (router2)
 
-# ========== POLICIES ==========
-policies:
-- node: router2              # Der normale Router, der die Manipulation vornimmt
-  neighbor: router1       # Der Nachbar, von dem die Route kommt
-  target_node: router4       # Das betroffene Ziel-Präfix
-  origin_code: incomplete    # Setzt den Origin Code auf 'incomplete' (?) oder 'igp' (i)
-
-# ERWARTETES RESULTAT:
-# router1 wählt Censor1. Beide bieten ein /24 Prefix an, aber der Zensor 
-# ist näher (1 Hop über censor1 vs. 2 Hops über router2->router3).
-# Die Zensur gewinnt "natürlich" durch den kürzeren AS-Path.

@@ -1,16 +1,55 @@
-import yaml
+import argparse
 import os
 import shutil
+import subprocess
+import yaml
+
+# Change this if you want a different default scenario without passing CLI args.
+DEFAULT_SCENARIO = "scenarios/1_subprefix_hijack.yaml"
+
+parser = argparse.ArgumentParser(description="Generate Containerlab topology and configs.")
+parser.add_argument(
+    "--scenario",
+    default=DEFAULT_SCENARIO,
+    help="Path to the scenario YAML (relative to repo root or absolute).",
+)
+parser.add_argument(
+    "--no-deploy",
+    action="store_true",
+    help="Only generate files; do not run containerlab deploy.",
+)
+parser.add_argument(
+    "--sudo",
+    action="store_true",
+    help="Run containerlab deploy with sudo.",
+)
+parser.add_argument(
+    "--no-graph",
+    action="store_true",
+    help="Do not generate the containerlab graph.",
+)
+parser.add_argument(
+    "--no-hard-clean",
+    action="store_true",
+    help="Skip force-removal of lab containers before deploy.",
+)
+args = parser.parse_args()
 
 # Wechsle in das Verzeichnis BGP_Testbed, in dem sich die Ordner 'scenarios' und 'generated' befinden
 bash_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(bash_dir)
 
+scenario_path = args.scenario
+if not os.path.isabs(scenario_path):
+    scenario_path = os.path.join(bash_dir, scenario_path)
+if not os.path.exists(scenario_path):
+    raise FileNotFoundError(f"Scenario file not found: {scenario_path}")
+
 if os.path.exists('generated'):
     shutil.rmtree('generated')
 os.makedirs('generated/configs', exist_ok=True)
 
-with open('scenarios/simple_nodes.yaml', 'r') as f:
+with open(scenario_path, 'r') as f:
     data = yaml.safe_load(f)
 
 routers = data['routers']  # ['router1', 'router2', 'router3', 'router4']
@@ -57,8 +96,6 @@ for link_num, link in enumerate(links):
     link_details.append({
         'endpoints': [f"{node_a}:eth{eth_a}", f"{node_b}:eth{eth_b}"]
     })
-
-import os
 
 os.makedirs('generated/configs', exist_ok=True)
 
@@ -235,8 +272,9 @@ route-map {rmap} deny 5
         config += route_maps
     
     # BGP
+    router_asn = 65000 + num
     config += f"""
-router bgp 6500{num}
+router bgp {router_asn}
  bgp router-id {num}.{num}.{num}.{num}
  no bgp ebgp-requires-policy"""
     
@@ -504,3 +542,36 @@ route-map RM-MITM-VICTIM permit 20
     # Schreiben
     with open(f'generated/configs/{censor_name}.conf', 'w') as f:
         f.write(config)
+
+if not args.no_deploy:
+    deploy_cwd = os.path.join(bash_dir, "generated")
+    if not args.no_hard_clean:
+        list_cmd = [
+            "sudo",
+            "docker",
+            "ps",
+            "-a",
+            "-q",
+            "--filter",
+            "label=containerlab=bgp-testbed",
+        ]
+        result = subprocess.run(list_cmd, capture_output=True, text=True, check=False)
+        container_ids = [cid for cid in result.stdout.split() if cid]
+        if container_ids:
+            rm_cmd = ["sudo", "docker", "rm", "-f", *container_ids]
+            subprocess.run(rm_cmd, check=False)
+    deploy_cmd = ["containerlab", "deploy", "-t", "lab.clab.yaml", "--reconfigure"]
+    if args.sudo:
+        deploy_cmd.insert(0, "sudo")
+    subprocess.run(deploy_cmd, cwd=deploy_cwd, check=True)
+    if not args.no_graph:
+        subprocess.run(["pkill", "-f", "containerlab graph"], check=False)
+        graph_cmd = ["containerlab", "graph", "-t", "lab.clab.yaml"]
+        if args.sudo:
+            graph_cmd.insert(0, "sudo")
+        subprocess.Popen(
+            graph_cmd,
+            cwd=deploy_cwd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )

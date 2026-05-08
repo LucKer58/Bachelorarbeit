@@ -1,0 +1,96 @@
+name: bgp-testbed
+
+# ========== ROUTER ==========
+# Tier-1: router1-3
+# Tier-2: router4-10
+# Tier-3: router11-30
+routers:
+- router1
+- router2
+- router3
+- router4
+- router5
+- router6
+- router7
+- router8
+- router9
+- router10
+- router11
+- router12
+- router13
+- router14
+- router15
+- router16
+- router17
+- router18
+- router19
+- router20
+- router21
+- router22
+- router23
+- router24
+- router25
+- router26
+- router27
+- router28
+- router29
+- router30
+
+# ========== LINKS ==========
+# Tier-1 full mesh (peer-to-peer)
+# Tier-2 dual-homed to Tier-1 (provider-customer)
+# Tier-3 to Tier-2 (provider-customer)
+links:
+# Tier-1 mesh
+- [router1, router2]
+- [router1, router3]
+- [router2, router3]
+
+# Tier-2 dual-homing
+- [router4, router1]
+- [router4, router2]
+- [router5, router1]
+- [router5, router3]
+- [router6, router2]
+- [router6, router3]
+- [router7, router1]
+- [router7, router2]
+- [router8, router1]
+- [router8, router3]
+- [router9, router2]
+- [router9, router3]
+- [router10, router1]
+- [router10, router2]
+
+# Tier-3 to Tier-2
+- [router11, router4]
+- [router12, router4]
+- [router12, router5]
+- [router13, router5]
+- [router14, router5]
+- [router14, router6]
+- [router15, router6]
+- [router16, router6]
+- [router16, router7]
+- [router17, router7]
+- [router18, router7]
+- [router18, router8]
+- [router19, router8]
+- [router20, router8]
+- [router20, router9]
+- [router21, router9]
+- [router22, router9]
+- [router22, router10]
+- [router23, router10]
+- [router24, router10]
+- [router25, router4]
+- [router26, router5]
+- [router27, router6]
+- [router28, router7]
+- [router29, router8]
+- [router30, router9]
+
+# ========== POLICIES ==========
+# Not set here. If you want automatic Local-Pref based on tiers,
+# the generator needs to be extended with relationship-aware policies.
+policies: []

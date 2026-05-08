@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "scenario",
+      "type": "promptString",
+      "description": "Scenario YAML path (relative to BGP_Testbed)",
+      "default": "scenarios/simple_nodes.yaml"
+    }
+  ],
+  "tasks": [
+    {
+      "label": "Generate topology",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "scripts/generate_topology.py",
+        "--scenario",
+        "${input:scenario}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/BGP_Testbed"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Deploy Containerlab",
+      "type": "shell",
+      "command": "sudo",
+      "args": [
+        "containerlab",
+        "deploy",
+        "-t",
+        "lab.clab.yaml",
+        "--reconfigure"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/BGP_Testbed/generated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Generate & Deploy",
+      "type": "shell",
+      "dependsOn": [
+        "Generate topology",
+        "Deploy Containerlab"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    }
+  ]
+}
