@@ -20,6 +20,7 @@ clab-bgp-testbed-t
 
 # Spezifisch generierte Testbed-Dateien
 generated/configs/roas.json
+generated/
 
 # Betriebssystem
 .DS_Store

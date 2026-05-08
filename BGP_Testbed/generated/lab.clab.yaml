@@ -25,22 +25,289 @@ topology:
       binds:
       - ./configs/frr4.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    censor1:
+    router5:
       kind: linux
       image: frrouting/frr:latest
       binds:
-      - ./configs/censor1.conf:/etc/frr/frr.conf
+      - ./configs/frr5.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router6:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr6.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router7:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr7.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router8:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr8.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router9:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr9.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router10:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr10.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router11:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr11.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router12:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr12.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router13:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr13.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router14:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr14.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router15:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr15.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router16:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr16.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router17:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr17.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router18:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr18.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router19:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr19.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router20:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr20.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router21:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr21.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router22:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr22.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router23:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr23.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router24:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr24.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router25:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr25.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router26:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr26.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router27:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr27.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router28:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr28.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router29:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr29.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
+    router30:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/frr30.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
   links:
   - endpoints:
     - router1:eth1
     - router2:eth1
   - endpoints:
-    - router2:eth2
+    - router1:eth2
     - router3:eth1
   - endpoints:
-    - router1:eth2
-    - censor1:eth1
-  - endpoints:
+    - router2:eth2
     - router3:eth2
+  - endpoints:
     - router4:eth1
+    - router1:eth3
+  - endpoints:
+    - router4:eth2
+    - router2:eth3
+  - endpoints:
+    - router5:eth1
+    - router1:eth4
+  - endpoints:
+    - router5:eth2
+    - router3:eth3
+  - endpoints:
+    - router6:eth1
+    - router2:eth4
+  - endpoints:
+    - router6:eth2
+    - router3:eth4
+  - endpoints:
+    - router7:eth1
+    - router1:eth5
+  - endpoints:
+    - router7:eth2
+    - router2:eth5
+  - endpoints:
+    - router8:eth1
+    - router1:eth6
+  - endpoints:
+    - router8:eth2
+    - router3:eth5
+  - endpoints:
+    - router9:eth1
+    - router2:eth6
+  - endpoints:
+    - router9:eth2
+    - router3:eth6
+  - endpoints:
+    - router10:eth1
+    - router1:eth7
+  - endpoints:
+    - router10:eth2
+    - router2:eth7
+  - endpoints:
+    - router11:eth1
+    - router4:eth3
+  - endpoints:
+    - router12:eth1
+    - router4:eth4
+  - endpoints:
+    - router12:eth2
+    - router5:eth3
+  - endpoints:
+    - router13:eth1
+    - router5:eth4
+  - endpoints:
+    - router14:eth1
+    - router5:eth5
+  - endpoints:
+    - router14:eth2
+    - router6:eth3
+  - endpoints:
+    - router15:eth1
+    - router6:eth4
+  - endpoints:
+    - router16:eth1
+    - router6:eth5
+  - endpoints:
+    - router16:eth2
+    - router7:eth3
+  - endpoints:
+    - router17:eth1
+    - router7:eth4
+  - endpoints:
+    - router18:eth1
+    - router7:eth5
+  - endpoints:
+    - router18:eth2
+    - router8:eth3
+  - endpoints:
+    - router19:eth1
+    - router8:eth4
+  - endpoints:
+    - router20:eth1
+    - router8:eth5
+  - endpoints:
+    - router20:eth2
+    - router9:eth3
+  - endpoints:
+    - router21:eth1
+    - router9:eth4
+  - endpoints:
+    - router22:eth1
+    - router9:eth5
+  - endpoints:
+    - router22:eth2
+    - router10:eth3
+  - endpoints:
+    - router23:eth1
+    - router10:eth4
+  - endpoints:
+    - router24:eth1
+    - router10:eth5
+  - endpoints:
+    - router25:eth1
+    - router4:eth5
+  - endpoints:
+    - router26:eth1
+    - router5:eth6
+  - endpoints:
+    - router27:eth1
+    - router6:eth6
+  - endpoints:
+    - router28:eth1
+    - router7:eth6
+  - endpoints:
+    - router29:eth1
+    - router8:eth6
+  - endpoints:
+    - router30:eth1
+    - router9:eth6
