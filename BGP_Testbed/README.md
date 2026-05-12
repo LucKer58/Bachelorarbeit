@@ -33,7 +33,7 @@ docker exec -it clab-bgp-testbed-router1 vtysh -c 'show ip bgp summary'
 
 #### Check route of packets
 ```bash
-docker exec clab-bgp-testbed-router3 traceroute -s 192.168.3.1 192.168.1.1
+docker exec clab-bgp-testbed-router1 traceroute -s 192.168.1.1 192.168.3.3
 docker exec -it clab-bgp-testbed-router1 vtysh -c 'show ip route'
 ```
 
@@ -41,6 +41,7 @@ docker exec -it clab-bgp-testbed-router1 vtysh -c 'show ip route'
 ```bash
 # On router1. It only shows the best routes from the origin's neighbors to the target router. 
 docker exec -it clab-bgp-testbed-router1 vtysh -c 'show ip bgp'
+docker exec -it clab-bgp-testbed-router1 vtysh -c "clear ip bgp *"
 ```
 
 #### Test Connectivity

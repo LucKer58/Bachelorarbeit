@@ -1,9 +1,6 @@
 name: bgp-testbed
 
 # ========== ROUTER ==========
-# Tier-1: router1-3
-# Tier-2: router4-10
-# Tier-3: router11-30
 routers:
 - router1
 - router2
@@ -35,6 +32,48 @@ routers:
 - router28
 - router29
 - router30
+
+tiers:
+  tier1:
+  - router1
+  - router2
+  - router3
+  tier2:
+  - router4
+  - router5
+  - router6
+  - router7
+  - router8
+  - router9
+  - router10
+  tier3:
+  - router11
+  - router12
+  - router13
+  - router14
+  - router15
+  - router16
+  - router17
+  - router18
+  - router19
+  - router20
+  - router21
+  - router22
+  - router23
+  - router24
+  - router25
+  - router26
+  - router27
+  - router28
+  - router29
+  - router30
+
+tier_policy:
+  model: gao-rexford
+  local_pref:
+    customer: 200
+    peer: 100
+    provider: 50
 
 # ========== LINKS ==========
 # Tier-1 full mesh (peer-to-peer)
@@ -91,6 +130,6 @@ links:
 - [router30, router9]
 
 # ========== POLICIES ==========
-# Not set here. If you want automatic Local-Pref based on tiers,
-# the generator needs to be extended with relationship-aware policies.
+# Static policy overrides (optional). Tier-based local-pref is applied
+# automatically when tiers + tier_policy are set above.
 policies: []

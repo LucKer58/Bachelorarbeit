@@ -50,7 +50,14 @@ interface lo
 
             neighbor_route_maps[neighbor_ip] = rmap_name
 
+            default_local_pref = None
+
             for p in pols:
+                if p.get("match") == "all":
+                    if "local_preference" in p:
+                        default_local_pref = p["local_preference"]
+                    seq += 10
+                    continue
                 target = p["target_node"]
                 target_num = int(target.replace("router", ""))
                 plist_name = f"PFX-{target.upper()}"
@@ -79,8 +86,10 @@ route-map {rmap_name} permit {seq}
                 seq += 10
 
             route_maps += f"""
-route-map {rmap_name} permit {seq}
-!"""
+route-map {rmap_name} permit {seq}"""
+            if default_local_pref is not None:
+                route_maps += f"\n set local-preference {default_local_pref}"
+            route_maps += "\n!"
 
         if router in rpki_routers:
             rpki_route_maps = """
