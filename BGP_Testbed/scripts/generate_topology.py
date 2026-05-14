@@ -1,5 +1,8 @@
 import argparse
+import os
 import re
+import subprocess
+import yaml
 
 from generator.censor_config import build_censor_configs
 from generator.core import (
@@ -15,7 +18,14 @@ from generator.deploy import run_deploy
 from generator.router_config import build_router_configs
 
 
-DEFAULT_SCENARIO = "scenarios/base_case_30.yaml"
+DEFAULT_SCENARIO = "scenarios/2_exact_hijack_no_pref.yaml"
+
+
+def write_scenario_snapshot(data, scenario_path, repo_root):
+    rel_path = os.path.relpath(scenario_path, repo_root)
+    snapshot = {"meta": {"source": rel_path}, "scenario": data}
+    with open("generated/scenario.yaml", "w") as handle:
+        yaml.safe_dump(snapshot, handle, sort_keys=False)
 
 
 def build_tier_policies(data, links):
@@ -109,6 +119,13 @@ def parse_args():
         action="store_true",
         help="Skip force-removal of lab containers before deploy.",
     )
+    parser.add_argument(
+        "--start-ui",
+        action="store_true",
+        help="Start the web UI server after generating the topology.",
+    )
+    parser.add_argument("--ui-host", default="127.0.0.1")
+    parser.add_argument("--ui-port", type=int, default=8080)
     return parser.parse_args()
 
 
@@ -119,6 +136,8 @@ def main():
 
     reset_generated_dir()
     data = load_scenario(scenario_path)
+
+    write_scenario_snapshot(data, scenario_path, bash_dir)
 
     routers = data["routers"]
     censors = data.get("censors", [])
@@ -140,6 +159,19 @@ def main():
     build_censor_configs(censors, connections, policies)
 
     run_deploy(args, bash_dir)
+
+    if args.start_ui:
+        ui_path = os.path.join(bash_dir, "webui", "server.py")
+        ui_cmd = [
+            "python3",
+            ui_path,
+            "--host",
+            args.ui_host,
+            "--port",
+            str(args.ui_port),
+        ]
+        subprocess.Popen(ui_cmd, cwd=bash_dir)
+        print(f"UI started on http://{args.ui_host}:{args.ui_port}")
 
 
 if __name__ == "__main__":

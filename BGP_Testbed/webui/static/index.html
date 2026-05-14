@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BGP Testbed Route Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css?v=20260513-3" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">BGP Testbed for Censorship Research</p>
+          <h1>Route Insight</h1>
+          <p class="subtitle">
+            Visualize best paths, hijack routes, node details and ping status from your deployed
+            topology.
+          </p>
+          <div class="scenario-bar">
+            <span id="scenario-name">Scenario: -</span>
+            <span id="scenario-counts">Routers: - · Censors: -</span>
+          </div>
+        </div>
+        <div class="legend">
+          <div class="legend-item">
+            <span class="dot router"></span>
+            <span>AS</span>
+          </div>
+          <div class="legend-item">
+            <span class="dot censor"></span>
+            <span>Censor</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="controls">
+          <label>
+            Source AS
+            <select id="source"></select>
+          </label>
+          <label>
+            Target AS
+            <select id="target"></select>
+          </label>
+          <button id="route-btn">See route</button>
+        </div>
+        <div class="status">
+          <div id="message" class="message">Pick a source and target.</div>
+          <div class="meta">
+            <span id="prefix">Prefix: -</span>
+            <span id="ping">Ping: -</span>
+            <span id="hijack">Hijack: -</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <div class="graph-card">
+          <h2>Topology</h2>
+          <div id="graph"></div>
+        </div>
+        <div class="side-stack">
+          <div class="path-card">
+            <h2>Selected path</h2>
+            <ol id="path"></ol>
+          </div>
+          <div class="detail-card">
+            <h2>Node details</h2>
+            <div id="node-title" class="detail-title">Click a router or censor.</div>
+            <div id="node-details" class="detail-list"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+    <script src="app.js?v=20260513-3"></script>
+  </body>
+</html>

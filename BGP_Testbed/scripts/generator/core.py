@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import yaml
 
@@ -29,6 +30,13 @@ def reset_generated_dir():
 def load_scenario(path):
     with open(path, "r") as f:
         return yaml.safe_load(f)
+
+
+def get_node_num(name):
+    match = re.search(r"\d+", str(name))
+    if not match:
+        raise ValueError(f"Unable to parse node number from {name}")
+    return int(match.group(0))
 
 
 def build_connections(links, all_nodes):
@@ -78,7 +86,7 @@ def write_lab_file(data, routers, censors, rpki_routers, link_details):
     }
 
     for router in routers:
-        num = int(router.replace("router", ""))
+        num = get_node_num(router)
         topology["topology"]["nodes"][router] = {
             "kind": "linux",
             "image": "frrouting/frr:latest",
@@ -118,7 +126,7 @@ def write_roas(routers):
 
     roas_data = {"roas": []}
     for r in routers:
-        r_num = int(r.replace("router", ""))
+        r_num = get_node_num(r)
         roas_data["roas"].append(
             {
                 "asn": f"AS6500{r_num}",

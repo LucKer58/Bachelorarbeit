@@ -122,7 +122,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Measure BGP convergence and ping recovery after a hijack withdrawal."
     )
-    parser.add_argument("--observer", default="router1", help="Observer router name.")
+    parser.add_argument("--observer", default="AS1", help="Observer AS name.")
     parser.add_argument("--container-prefix", default="clab-bgp-testbed-", help="Container name prefix.")
     parser.add_argument("--origin-prefix", default="192.168.3.0/24", help="Legit prefix.")
     parser.add_argument("--hijack-prefix", default="192.168.3.0/25", help="Hijack subprefix.")

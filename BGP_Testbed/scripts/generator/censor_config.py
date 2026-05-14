@@ -1,12 +1,14 @@
 from collections import defaultdict
 
+from generator.core import get_node_num
+
 
 def build_censor_configs(censors, connections, policies):
     for censor in censors:
         censor_name = censor["name"]
-        censor_num = int(censor_name.replace("censor", ""))
+        censor_num = get_node_num(censor_name)
         target_router = censor["target_router"]
-        target_num = int(target_router.replace("router", ""))
+        target_num = get_node_num(target_router)
         attack_type = censor["attack_type"]
 
         censor_connections = connections[censor_name]
@@ -55,7 +57,7 @@ interface lo
 
             for p in pols:
                 target = p["target_node"]
-                target_num = int(target.replace("router", ""))
+                target_num = get_node_num(target)
                 plist_name = f"PFX-{target.upper()}"
 
                 if f"ip prefix-list {plist_name}" not in censor_prefix_lists:
@@ -147,10 +149,10 @@ router bgp {censor_asn}
 
         for conn in censor_connections:
             neighbor = conn["neighbor"]
-            if neighbor.startswith("router"):
-                neighbor_asn = 65000 + int(neighbor.replace("router", ""))
-            elif neighbor.startswith("censor"):
-                neighbor_asn = 65900 + int(neighbor.replace("censor", ""))
+            if neighbor.startswith("censor"):
+                neighbor_asn = 65900 + get_node_num(neighbor)
+            else:
+                neighbor_asn = 65000 + get_node_num(neighbor)
             config += f"""
  neighbor {conn['neighbor_ip']} remote-as {neighbor_asn}"""
 

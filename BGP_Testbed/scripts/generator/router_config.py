@@ -1,9 +1,11 @@
 from collections import defaultdict
 
+from generator.core import get_node_num
+
 
 def build_router_configs(routers, connections, policies, rpki_routers):
     for router in routers:
-        num = int(router.replace("router", ""))
+        num = get_node_num(router)
         router_connections = connections[router]
         my_policies = [p for p in policies if p["node"] == router]
 
@@ -59,7 +61,7 @@ interface lo
                     seq += 10
                     continue
                 target = p["target_node"]
-                target_num = int(target.replace("router", ""))
+                target_num = get_node_num(target)
                 plist_name = f"PFX-{target.upper()}"
 
                 if f"ip prefix-list {plist_name}" not in prefix_lists:
@@ -120,10 +122,10 @@ router bgp {router_asn}
             neighbor = conn["neighbor"]
             neighbor_ip = conn["neighbor_ip"]
 
-            if neighbor.startswith("router"):
-                neighbor_asn = 65000 + int(neighbor.replace("router", ""))
-            elif neighbor.startswith("censor"):
-                neighbor_asn = 65900 + int(neighbor.replace("censor", ""))
+            if neighbor.startswith("censor"):
+                neighbor_asn = 65900 + get_node_num(neighbor)
+            else:
+                neighbor_asn = 65000 + get_node_num(neighbor)
 
             config += f"""
  neighbor {neighbor_ip} remote-as {neighbor_asn}"""

@@ -1,32 +1,34 @@
 name: bgp-testbed
 
 # ========== ROUTER ==========
-# router1 = Opfer (Inland)
-# router2 = Transit
-# router3 = Ziel (Ausland)
+# AS1 = Opfer (Inland)
+# AS2 = Transit
+# AS3 = Ziel (Ausland)
 routers:
-- router1
-- router2
-- router3
+- AS1
+- AS2
+- AS3
+- AS4
 
 # ========== LINKS ==========
 # WICHTIG: Für einen MitM-Angriff muss der Zensor ZWISCHEN Opfer und Ziel sitzen.
-# Der Zensor hat hier also eine Verbindung nach Hause (router1) UND nach draußen (router2).
+# Der Zensor hat hier also eine Verbindung nach Hause (AS1) UND nach draußen (AS2).
 links:
-- [router1, router2]
-- [router2, router3]
-- [router1, censor1]
-- [censor1, router2]    # NEU: Der Zensor kann Pakete weiterleiten!
+- [AS1, AS2]
+- [AS2, AS3]
+- [AS1, censor1]
+- [censor1, AS2]
+- [AS3, AS4]    # NEU: Der Zensor kann Pakete weiterleiten!
 
 # ========== ZENSOREN ==========
 censors:
 - name: censor1
-  target_router: router3
+  target_router: AS4
   attack_type: mitm
   prefix_type: subprefix
   # Der Knoten, an den der Zensor die belauschten Pakete schicken soll, 
   # statt sie wie bei "hijack" oder "blackhole" wegzuwerfen.
-  mitm_forward_node: router2 
+  mitm_forward_node: AS2 
 
 # ========== POLICIES ==========
 policies: []

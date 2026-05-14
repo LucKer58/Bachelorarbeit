@@ -2,71 +2,71 @@ name: bgp-testbed
 
 # ========== ROUTER ==========
 routers:
-- router1
-- router2
-- router3
-- router4
-- router5
-- router6
-- router7
-- router8
-- router9
-- router10
-- router11
-- router12
-- router13
-- router14
-- router15
-- router16
-- router17
-- router18
-- router19
-- router20
-- router21
-- router22
-- router23
-- router24
-- router25
-- router26
-- router27
-- router28
-- router29
-- router30
+- AS1
+- AS2
+- AS3
+- AS4
+- AS5
+- AS6
+- AS7
+- AS8
+- AS9
+- AS10
+- AS11
+- AS12
+- AS13
+- AS14
+- AS15
+- AS16
+- AS17
+- AS18
+- AS19
+- AS20
+- AS21
+- AS22
+- AS23
+- AS24
+- AS25
+- AS26
+- AS27
+- AS28
+- AS29
+- AS30
 
 tiers:
   tier1:
-  - router1
-  - router2
-  - router3
+  - AS1
+  - AS2
+  - AS3
   tier2:
-  - router4
-  - router5
-  - router6
-  - router7
-  - router8
-  - router9
-  - router10
+  - AS4
+  - AS5
+  - AS6
+  - AS7
+  - AS8
+  - AS9
+  - AS10
   tier3:
-  - router11
-  - router12
-  - router13
-  - router14
-  - router15
-  - router16
-  - router17
-  - router18
-  - router19
-  - router20
-  - router21
-  - router22
-  - router23
-  - router24
-  - router25
-  - router26
-  - router27
-  - router28
-  - router29
-  - router30
+  - AS11
+  - AS12
+  - AS13
+  - AS14
+  - AS15
+  - AS16
+  - AS17
+  - AS18
+  - AS19
+  - AS20
+  - AS21
+  - AS22
+  - AS23
+  - AS24
+  - AS25
+  - AS26
+  - AS27
+  - AS28
+  - AS29
+  - AS30
 
 tier_policy:
   model: gao-rexford
@@ -81,53 +81,53 @@ tier_policy:
 # Tier-3 to Tier-2 (provider-customer)
 links:
 # Tier-1 mesh
-- [router1, router2]
-- [router1, router3]
-- [router2, router3]
+- [AS1, AS2]
+- [AS1, AS3]
+- [AS2, AS3]
 
 # Tier-2 dual-homing
-- [router4, router1]
-- [router4, router2]
-- [router5, router1]
-- [router5, router3]
-- [router6, router2]
-- [router6, router3]
-- [router7, router1]
-- [router7, router2]
-- [router8, router1]
-- [router8, router3]
-- [router9, router2]
-- [router9, router3]
-- [router10, router1]
-- [router10, router2]
+- [AS4, AS1]
+- [AS4, AS2]
+- [AS5, AS1]
+- [AS5, AS3]
+- [AS6, AS2]
+- [AS6, AS3]
+- [AS7, AS1]
+- [AS7, AS2]
+- [AS8, AS1]
+- [AS8, AS3]
+- [AS9, AS2]
+- [AS9, AS3]
+- [AS10, AS1]
+- [AS10, AS2]
 
 # Tier-3 to Tier-2
-- [router11, router4]
-- [router12, router4]
-- [router12, router5]
-- [router13, router5]
-- [router14, router5]
-- [router14, router6]
-- [router15, router6]
-- [router16, router6]
-- [router16, router7]
-- [router17, router7]
-- [router18, router7]
-- [router18, router8]
-- [router19, router8]
-- [router20, router8]
-- [router20, router9]
-- [router21, router9]
-- [router22, router9]
-- [router22, router10]
-- [router23, router10]
-- [router24, router10]
-- [router25, router4]
-- [router26, router5]
-- [router27, router6]
-- [router28, router7]
-- [router29, router8]
-- [router30, router9]
+- [AS11, AS4]
+- [AS12, AS4]
+- [AS12, AS5]
+- [AS13, AS5]
+- [AS14, AS5]
+- [AS14, AS6]
+- [AS15, AS6]
+- [AS16, AS6]
+- [AS16, AS7]
+- [AS17, AS7]
+- [AS18, AS7]
+- [AS18, AS8]
+- [AS19, AS8]
+- [AS20, AS8]
+- [AS20, AS9]
+- [AS21, AS9]
+- [AS22, AS9]
+- [AS22, AS10]
+- [AS23, AS10]
+- [AS24, AS10]
+- [AS25, AS4]
+- [AS26, AS5]
+- [AS27, AS6]
+- [AS28, AS7]
+- [AS29, AS8]
+- [AS30, AS9]
 
 # ========== POLICIES ==========
 # Static policy overrides (optional). Tier-based local-pref is applied

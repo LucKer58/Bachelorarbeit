@@ -1,13 +1,13 @@
 name: bgp-testbed
 
 routers:
-- router1
-- router2
-- router3
-- router4
+- AS1
+- AS2
+- AS3
+- AS4
 
 links:
-- [router1, router2]
-- [router1, router3]
-- [router2, router3]
-- [router3, router4]
+- [AS1, AS2]
+- [AS1, AS3]
+- [AS2, AS3]
+- [AS3, AS4]
