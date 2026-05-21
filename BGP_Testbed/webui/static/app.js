@@ -18,6 +18,14 @@ let nodeSelection = null;
 let selectedNode = null;
 let clickStart = null;
 
+function getNodeRadius(node) {
+  if (node.type === "censor") return 13;
+  if (node.tier === 1) return 16;
+  if (node.tier === 2) return 13;
+  if (node.tier === 3) return 11;
+  return 12;
+}
+
 function formatValue(value) {
   if (Array.isArray(value)) {
     return value.length ? value.join(", ") : "-";
@@ -185,7 +193,10 @@ function buildGraph(data) {
     .selectAll("g")
     .data(data.nodes)
     .join("g")
-    .attr("class", (d) => `node ${d.type}`)
+    .attr("class", (d) => {
+      const tierClass = d.tier ? `tier-${d.tier}` : "";
+      return `node ${d.type} ${tierClass}`.trim();
+    })
     .call(
       d3
         .drag()
@@ -235,7 +246,7 @@ function buildGraph(data) {
     clearNodeDetails();
   });
 
-  nodeSelection.append("circle").attr("r", 12);
+  nodeSelection.append("circle").attr("r", (d) => getNodeRadius(d));
 
   nodeSelection
     .append("text")

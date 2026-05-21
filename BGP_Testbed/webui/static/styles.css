@@ -298,6 +298,14 @@ button {
   fill: var(--text);
 }
 
+.node.tier-1 text {
+  font-size: 12px;
+}
+
+.node.tier-3 text {
+  font-size: 10px;
+}
+
 @media (max-width: 960px) {
   .hero {
     flex-direction: column;

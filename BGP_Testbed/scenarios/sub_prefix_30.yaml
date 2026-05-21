@@ -1,0 +1,150 @@
+name: bgp-testbed
+
+# ========== ROUTER ==========
+routers:
+- AS2
+- AS3
+- AS4
+- AS5
+- AS6
+- AS7
+- AS8
+- AS9
+- AS10
+- AS11
+- AS12
+- AS13
+- AS14
+- AS15
+- AS16
+- AS17
+- AS18
+- AS19
+- AS20
+- AS21
+- AS22
+- AS23
+- AS24
+- AS25
+- AS26
+- AS27
+- AS28
+- AS29
+- AS30
+
+tiers:
+  tier1:
+  - censor1
+  - AS2
+  - AS3
+  tier2:
+  - AS4
+  - AS5
+  - AS6
+  - AS7
+  - AS8
+  - AS9
+  - AS10
+  tier3:
+  - AS11
+  - AS12
+  - AS13
+  - AS14
+  - AS15
+  - AS16
+  - AS17
+  - AS18
+  - AS19
+  - AS20
+  - AS21
+  - AS22
+  - AS23
+  - AS24
+  - AS25
+  - AS26
+  - AS27
+  - AS28
+  - AS29
+  - AS30
+
+tier_policy:
+  model: gao-rexford
+  local_pref:
+    customer: 200
+    peer: 100
+    provider: 50
+
+# ========== LINKS ==========
+# Tier-1 full mesh (peer-to-peer)
+# Tier-2 dual-homed to Tier-1 (provider-customer)
+# Tier-3 to Tier-2 (provider-customer)
+links:
+# Tier-1 mesh
+- [censor1, AS2]
+- [censor1, AS3]
+- [AS2, AS3]
+
+# Tier-2 dual-homing
+- [AS4, censor1]
+- [AS4, AS2]
+- [AS5, censor1]
+- [AS5, AS3]
+- [AS6, AS2]
+- [AS6, AS3]
+- [AS7, censor1]
+- [AS7, AS2]
+- [AS8, censor1]
+- [AS8, AS3]
+- [AS9, AS2]
+- [AS9, AS3]
+- [AS10, censor1]
+- [AS10, AS2]
+
+# Tier-2 to tier-2
+- [AS4, AS9]
+- [AS4, AS10]
+- [AS9, AS6]
+- [AS6, AS8]
+- [AS8, AS5]
+- [AS5, AS7]
+- [AS7, AS10]
+
+# Tier-3 to Tier-2
+- [AS11, AS4]
+- [AS12, AS4]
+- [AS12, AS5]
+- [AS13, AS5]
+- [AS14, AS5]
+- [AS14, AS6]
+- [AS15, AS6]
+- [AS16, AS6]
+- [AS16, AS7]
+- [AS17, AS7]
+- [AS18, AS7]
+- [AS18, AS8]
+- [AS19, AS8]
+- [AS20, AS8]
+- [AS20, AS9]
+- [AS21, AS9]
+- [AS22, AS9]
+- [AS22, AS10]
+- [AS23, AS10]
+- [AS24, AS10]
+- [AS25, AS4]
+- [AS26, AS5]
+- [AS27, AS6]
+- [AS28, AS7]
+- [AS29, AS8]
+- [AS30, AS9]
+
+censors:
+- name: censor1
+  target_router: AS15
+  attack_type: hijack
+  prefix_type: subprefix
+  isp_mode: true
+
+# ========== POLICIES ==========
+# Static policy overrides (optional). Tier-based local-pref is applied
+# automatically when tiers + tier_policy are set above.
+policies: []

@@ -3,13 +3,20 @@ from collections import defaultdict
 from generator.core import get_node_num
 
 
-def build_censor_configs(censors, connections, policies):
+def build_censor_configs(censors, connections, policies, customer_cones=None):
+    customer_cones = customer_cones or {}
     for censor in censors:
         censor_name = censor["name"]
         censor_num = get_node_num(censor_name)
         target_router = censor["target_router"]
         target_num = get_node_num(target_router)
+        hijack_target_num = target_num
         attack_type = censor["attack_type"]
+        prefix_type = censor.get("prefix_type", "exact")
+        use_tier_policy = bool(
+            censor.get("isp_mode") or censor.get("follow_tier_policy")
+        )
+        customer_cone = customer_cones.get(censor_name, [])
 
         censor_connections = connections[censor_name]
         censor_asn = 65900 + censor_num
@@ -37,12 +44,19 @@ interface lo
 
         my_censor_policies = [p for p in policies if p["node"] == censor_name]
         policies_by_neighbor_censor = defaultdict(list)
+        neighbor_relationships = {}
         for p in my_censor_policies:
             policies_by_neighbor_censor[p["neighbor"]].append(p)
+            relation = p.get("relationship")
+            if relation:
+                neighbor_relationships[p["neighbor"]] = relation
 
         censor_prefix_lists = ""
         censor_in_route_maps = ""
         censor_neighbor_in_rmaps = {}
+        cone_prefix_list = ""
+        censor_out_route_maps = ""
+        censor_neighbor_out_rmaps = {}
 
         for neighbor, pols in policies_by_neighbor_censor.items():
             rmap_name = f"RM-IN-{neighbor.upper()}"
@@ -55,14 +69,25 @@ interface lo
 
             censor_neighbor_in_rmaps[neighbor_ip] = rmap_name
 
+            default_local_pref = None
+            relation = neighbor_relationships.get(neighbor)
+
             for p in pols:
-                target = p["target_node"]
-                target_num = get_node_num(target)
-                plist_name = f"PFX-{target.upper()}"
+                if p.get("match") == "all":
+                    if "local_preference" in p:
+                        default_local_pref = p["local_preference"]
+                    seq += 10
+                    continue
+
+                policy_target = p.get("target_node")
+                if not policy_target:
+                    continue
+                policy_target_num = get_node_num(policy_target)
+                plist_name = f"PFX-{policy_target.upper()}"
 
                 if f"ip prefix-list {plist_name}" not in censor_prefix_lists:
                     censor_prefix_lists += f"""
-ip prefix-list {plist_name} seq 5 permit 192.168.{target_num}.0/24
+ip prefix-list {plist_name} seq 5 permit 192.168.{policy_target_num}.0/24
 !"""
 
                 censor_in_route_maps += f"""
@@ -84,14 +109,42 @@ route-map {rmap_name} permit {seq}
                 seq += 10
 
             censor_in_route_maps += f"""
-route-map {rmap_name} permit {seq}
+route-map {rmap_name} permit {seq}"""
+            if default_local_pref is not None:
+                censor_in_route_maps += f"\n set local-preference {default_local_pref}"
+            censor_in_route_maps += "\n!"
+
+            if use_tier_policy and relation in {"peer", "provider"}:
+                if not cone_prefix_list:
+                    if prefix_type == "subprefix":
+                        attack_prefix = f"192.168.{hijack_target_num}.0/25"
+                    else:
+                        attack_prefix = f"192.168.{hijack_target_num}.0/24"
+                    cone_prefix_list = (
+                        f"\nip prefix-list PFX-CONE seq 5 permit {attack_prefix}"
+                    )
+                    seq_num = 10
+                    for node in customer_cone:
+                        node_num = get_node_num(node)
+                        cone_prefix_list += (
+                            f"\n ip prefix-list PFX-CONE seq {seq_num} permit 192.168.{node_num}.0/24"
+                        )
+                        seq_num += 5
+                    cone_prefix_list += "\n!"
+
+                out_name = f"RM-OUT-{neighbor.upper()}"
+                censor_neighbor_out_rmaps[neighbor_ip] = out_name
+                censor_out_route_maps += f"""
+route-map {out_name} permit 10
+ match ip address prefix-list PFX-CONE
+!
+route-map {out_name} deny 20
 !"""
 
-        prefix_type = censor.get("prefix_type", "exact")
         if prefix_type == "subprefix":
-            prefix = f"192.168.{target_num}.0/25"
+            prefix = f"192.168.{hijack_target_num}.0/25"
         else:
-            prefix = f"192.168.{target_num}.0/24"
+            prefix = f"192.168.{hijack_target_num}.0/24"
 
         mitm_forward_node = censor.get("mitm_forward_node")
         if attack_type == "mitm" and mitm_forward_node:
@@ -113,7 +166,7 @@ route-map {rmap_name} permit {seq}
             route_maps += f"route-map {attack_rmap_name} permit 10\n"
 
             if attack_type == "as_path_poisoning":
-                poison_asn = censor.get("poison_asn", 65000 + target_num)
+                poison_asn = censor.get("poison_asn", 65000 + hijack_target_num)
                 route_maps += f" set as-path prepend {poison_asn}\n"
 
             elif attack_type == "as_path_forgery":
@@ -121,7 +174,7 @@ route-map {rmap_name} permit {seq}
                 route_maps += f" set as-path prepend {fake_path}\n"
 
             elif attack_type == "origin_spoofing":
-                target_asn = 65000 + target_num
+                target_asn = 65000 + hijack_target_num
                 route_maps += f" set as-path prepend {target_asn}\n"
             elif attack_type == "origin_code_manipulation":
                 origin_code = censor.get("origin_code", "incomplete")
@@ -134,12 +187,16 @@ route-map {rmap_name} permit {seq}
 
         if censor_prefix_lists:
             config += f"\n{censor_prefix_lists.strip()}"
+        if cone_prefix_list:
+            config += f"\n{cone_prefix_list.strip()}"
         if static_routes:
             config += f"\n{static_routes.strip()}"
         if route_maps:
             config += f"\n!\n{route_maps.strip()}"
         if censor_in_route_maps:
             config += f"\n!\n{censor_in_route_maps.strip()}"
+        if censor_out_route_maps:
+            config += f"\n!\n{censor_out_route_maps.strip()}"
 
         config += f"""
 !
@@ -180,6 +237,9 @@ router bgp {censor_asn}
                     config += (
                         f"\n  neighbor {conn['neighbor_ip']} route-map RM-MITM-VICTIM out\n"
                     )
+            elif conn["neighbor_ip"] in censor_neighbor_out_rmaps:
+                rmap = censor_neighbor_out_rmaps[conn["neighbor_ip"]]
+                config += f"\n  neighbor {conn['neighbor_ip']} route-map {rmap} out"
 
         config += """
  exit-address-family

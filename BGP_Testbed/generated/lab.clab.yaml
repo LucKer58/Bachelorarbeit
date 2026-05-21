@@ -1,313 +1,334 @@
 name: bgp-testbed
 topology:
   nodes:
-    router1:
-      kind: linux
-      image: frrouting/frr:latest
-      binds:
-      - ./configs/frr1.conf:/etc/frr/frr.conf
-      - ../configs/daemons:/etc/frr/daemons
-    router2:
+    AS2:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr2.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router3:
+    AS3:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr3.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router4:
+    AS4:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr4.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router5:
+    AS5:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr5.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router6:
+    AS6:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr6.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router7:
+    AS7:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr7.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router8:
+    AS8:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr8.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router9:
+    AS9:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr9.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router10:
+    AS10:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr10.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router11:
+    AS11:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr11.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router12:
+    AS12:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr12.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router13:
+    AS13:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr13.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router14:
+    AS14:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr14.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router15:
+    AS15:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr15.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router16:
+    AS16:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr16.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router17:
+    AS17:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr17.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router18:
+    AS18:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr18.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router19:
+    AS19:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr19.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router20:
+    AS20:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr20.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router21:
+    AS21:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr21.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router22:
+    AS22:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr22.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router23:
+    AS23:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr23.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router24:
+    AS24:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr24.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router25:
+    AS25:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr25.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router26:
+    AS26:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr26.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router27:
+    AS27:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr27.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router28:
+    AS28:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr28.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router29:
+    AS29:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr29.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
-    router30:
+    AS30:
       kind: linux
       image: frrouting/frr:latest
       binds:
       - ./configs/frr30.conf:/etc/frr/frr.conf
       - ../configs/daemons:/etc/frr/daemons
+    censor1:
+      kind: linux
+      image: frrouting/frr:latest
+      binds:
+      - ./configs/censor1.conf:/etc/frr/frr.conf
+      - ../configs/daemons:/etc/frr/daemons
   links:
   - endpoints:
-    - router1:eth1
-    - router2:eth1
+    - censor1:eth1
+    - AS2:eth1
   - endpoints:
-    - router1:eth2
-    - router3:eth1
+    - censor1:eth2
+    - AS3:eth1
   - endpoints:
-    - router2:eth2
-    - router3:eth2
+    - AS2:eth2
+    - AS3:eth2
   - endpoints:
-    - router4:eth1
-    - router1:eth3
+    - AS4:eth1
+    - censor1:eth3
   - endpoints:
-    - router4:eth2
-    - router2:eth3
+    - AS4:eth2
+    - AS2:eth3
   - endpoints:
-    - router5:eth1
-    - router1:eth4
+    - AS5:eth1
+    - censor1:eth4
   - endpoints:
-    - router5:eth2
-    - router3:eth3
+    - AS5:eth2
+    - AS3:eth3
   - endpoints:
-    - router6:eth1
-    - router2:eth4
+    - AS6:eth1
+    - AS2:eth4
   - endpoints:
-    - router6:eth2
-    - router3:eth4
+    - AS6:eth2
+    - AS3:eth4
   - endpoints:
-    - router7:eth1
-    - router1:eth5
+    - AS7:eth1
+    - censor1:eth5
   - endpoints:
-    - router7:eth2
-    - router2:eth5
+    - AS7:eth2
+    - AS2:eth5
   - endpoints:
-    - router8:eth1
-    - router1:eth6
+    - AS8:eth1
+    - censor1:eth6
   - endpoints:
-    - router8:eth2
-    - router3:eth5
+    - AS8:eth2
+    - AS3:eth5
   - endpoints:
-    - router9:eth1
-    - router2:eth6
+    - AS9:eth1
+    - AS2:eth6
   - endpoints:
-    - router9:eth2
-    - router3:eth6
+    - AS9:eth2
+    - AS3:eth6
   - endpoints:
-    - router10:eth1
-    - router1:eth7
+    - AS10:eth1
+    - censor1:eth7
   - endpoints:
-    - router10:eth2
-    - router2:eth7
+    - AS10:eth2
+    - AS2:eth7
   - endpoints:
-    - router11:eth1
-    - router4:eth3
+    - AS4:eth3
+    - AS9:eth3
   - endpoints:
-    - router12:eth1
-    - router4:eth4
+    - AS4:eth4
+    - AS10:eth3
   - endpoints:
-    - router12:eth2
-    - router5:eth3
+    - AS9:eth4
+    - AS6:eth3
   - endpoints:
-    - router13:eth1
-    - router5:eth4
+    - AS6:eth4
+    - AS8:eth3
   - endpoints:
-    - router14:eth1
-    - router5:eth5
+    - AS8:eth4
+    - AS5:eth3
   - endpoints:
-    - router14:eth2
-    - router6:eth3
+    - AS5:eth4
+    - AS7:eth3
   - endpoints:
-    - router15:eth1
-    - router6:eth4
+    - AS7:eth4
+    - AS10:eth4
   - endpoints:
-    - router16:eth1
-    - router6:eth5
+    - AS11:eth1
+    - AS4:eth5
   - endpoints:
-    - router16:eth2
-    - router7:eth3
+    - AS12:eth1
+    - AS4:eth6
   - endpoints:
-    - router17:eth1
-    - router7:eth4
+    - AS12:eth2
+    - AS5:eth5
   - endpoints:
-    - router18:eth1
-    - router7:eth5
+    - AS13:eth1
+    - AS5:eth6
   - endpoints:
-    - router18:eth2
-    - router8:eth3
+    - AS14:eth1
+    - AS5:eth7
   - endpoints:
-    - router19:eth1
-    - router8:eth4
+    - AS14:eth2
+    - AS6:eth5
   - endpoints:
-    - router20:eth1
-    - router8:eth5
+    - AS15:eth1
+    - AS6:eth6
   - endpoints:
-    - router20:eth2
-    - router9:eth3
+    - AS16:eth1
+    - AS6:eth7
   - endpoints:
-    - router21:eth1
-    - router9:eth4
+    - AS16:eth2
+    - AS7:eth5
   - endpoints:
-    - router22:eth1
-    - router9:eth5
+    - AS17:eth1
+    - AS7:eth6
   - endpoints:
-    - router22:eth2
-    - router10:eth3
+    - AS18:eth1
+    - AS7:eth7
   - endpoints:
-    - router23:eth1
-    - router10:eth4
+    - AS18:eth2
+    - AS8:eth5
   - endpoints:
-    - router24:eth1
-    - router10:eth5
+    - AS19:eth1
+    - AS8:eth6
   - endpoints:
-    - router25:eth1
-    - router4:eth5
+    - AS20:eth1
+    - AS8:eth7
   - endpoints:
-    - router26:eth1
-    - router5:eth6
+    - AS20:eth2
+    - AS9:eth5
   - endpoints:
-    - router27:eth1
-    - router6:eth6
+    - AS21:eth1
+    - AS9:eth6
   - endpoints:
-    - router28:eth1
-    - router7:eth6
+    - AS22:eth1
+    - AS9:eth7
   - endpoints:
-    - router29:eth1
-    - router8:eth6
+    - AS22:eth2
+    - AS10:eth5
   - endpoints:
-    - router30:eth1
-    - router9:eth6
+    - AS23:eth1
+    - AS10:eth6
+  - endpoints:
+    - AS24:eth1
+    - AS10:eth7
+  - endpoints:
+    - AS25:eth1
+    - AS4:eth7
+  - endpoints:
+    - AS26:eth1
+    - AS5:eth8
+  - endpoints:
+    - AS27:eth1
+    - AS6:eth8
+  - endpoints:
+    - AS28:eth1
+    - AS7:eth8
+  - endpoints:
+    - AS29:eth1
+    - AS8:eth8
+  - endpoints:
+    - AS30:eth1
+    - AS9:eth8

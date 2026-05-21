@@ -71,11 +71,15 @@ def build_tier_policies(data, links):
                 continue
             if neighbor_tier > router_tier:
                 pref = customer_pref
+                relationship = "customer"
             elif neighbor_tier < router_tier:
                 pref = provider_pref
+                relationship = "provider"
             else:
                 if peer_pref == 100:
-                    continue
+                    relationship = "peer"
+                else:
+                    relationship = "peer"
                 pref = peer_pref
 
             policies.append(
@@ -84,10 +88,41 @@ def build_tier_policies(data, links):
                     "neighbor": neighbor,
                     "match": "all",
                     "local_preference": pref,
+                    "relationship": relationship,
                 }
             )
 
-    return policies
+    return policies, tier_map
+
+
+def build_customer_cones(tier_map, links):
+    if not tier_map:
+        return {}
+
+    provider_to_customers = {node: set() for node in tier_map}
+    for node_a, node_b in links:
+        if node_a not in tier_map or node_b not in tier_map:
+            continue
+        tier_a = tier_map[node_a]
+        tier_b = tier_map[node_b]
+        if tier_a < tier_b:
+            provider_to_customers[node_a].add(node_b)
+        elif tier_b < tier_a:
+            provider_to_customers[node_b].add(node_a)
+
+    cones = {}
+    for node in tier_map:
+        stack = list(provider_to_customers.get(node, []))
+        seen = set()
+        while stack:
+            current = stack.pop()
+            if current in seen:
+                continue
+            seen.add(current)
+            stack.extend(provider_to_customers.get(current, []))
+        cones[node] = sorted(seen)
+
+    return cones
 
 
 def parse_args():
@@ -144,9 +179,12 @@ def main():
     rpki_routers = data.get("rpki_routers", [])
     links = data["links"]
     policies = data.get("policies", [])
+    customer_cones = {}
     tier_policies = build_tier_policies(data, links)
     if tier_policies:
+        tier_policies, tier_map = tier_policies
         policies = policies + tier_policies
+        customer_cones = build_customer_cones(tier_map, links)
 
     all_nodes = routers + [c["name"] for c in censors]
     connections, link_details = build_connections(links, all_nodes)
@@ -155,7 +193,7 @@ def main():
     if rpki_routers:
         write_roas(routers)
 
-    build_router_configs(routers, connections, policies, rpki_routers)
+    build_router_configs(routers, connections, policies, rpki_routers, customer_cones)
     build_censor_configs(censors, connections, policies)
 
     run_deploy(args, bash_dir)

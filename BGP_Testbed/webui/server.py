@@ -375,7 +375,7 @@ def resolve_route(source, target):
     elif hijack_active:
         message = f"Hijack active via {hijack_censor}, but ping still succeeds."
     else:
-        message = "Ping succeeded: route follows the legit origin."
+        message = "Ping succeeded: route follows the legit path."
 
     return {
         "source": source,
@@ -403,10 +403,15 @@ def load_topology_payload():
     nodes = lab.get("topology", {}).get("nodes", {})
     links = lab.get("topology", {}).get("links", [])
 
+    tiers = scenario.get("tiers", {})
+
     payload_nodes = []
     for name in nodes.keys():
         node_type = "censor" if is_censor_name(name) else "router"
-        payload_nodes.append({"id": name, "type": node_type})
+        payload = {"id": name, "type": node_type}
+        if node_type == "router":
+            payload["tier"] = resolve_tier(tiers, name)
+        payload_nodes.append(payload)
 
     payload_links = []
     for link in links:
