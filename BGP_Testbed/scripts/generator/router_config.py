@@ -2,11 +2,12 @@ from collections import defaultdict
 
 from generator.core import get_node_num
 
-COMMUNITY_FROM_CUSTOMER = "65000:100"
-COMMUNITY_FROM_PEER = "65000:200"
-COMMUNITY_FROM_PROVIDER = "65000:300"
+COMMUNITY_FROM_CUSTOMER = "65000:1"
+COMMUNITY_FROM_PEER = "65000:2"
+COMMUNITY_FROM_PROVIDER = "65000:3"
 COMMUNITY_LIST_NON_CUSTOMER = "CL-NON-CUSTOMER"
 COMMUNITY_LIST_CUSTOMER = "CL-CUSTOMER"
+COMMUNITY_LIST_RELATION = "CL-RELATION"
 ORIGIN_ROUTE_MAP = "RM-ORIGIN-CUSTOMER"
 RELATION_COMMUNITY = {
     "customer": COMMUNITY_FROM_CUSTOMER,
@@ -21,8 +22,6 @@ def build_router_configs(routers, connections, policies, rpki_routers, customer_
         num = get_node_num(router)
         router_connections = connections[router]
         my_policies = [p for p in policies if p["node"] == router]
-        customer_cone = customer_cones.get(router, [])
-
         config = f"""frr defaults traditional
 !
 hostname {router}
@@ -32,6 +31,7 @@ hostname {router}
             config += """
 rpki
  rpki polling_period 10
+ rpki retry_interval 5
  rpki cache rpki-validator 3323 preference 1
  exit
 !"""
@@ -56,7 +56,6 @@ interface lo
                 neighbor_relationships[p["neighbor"]] = relation
 
         prefix_lists = ""
-        cone_prefix_list = ""
         community_lists = ""
         route_maps = ""
         out_route_maps = ""
@@ -112,6 +111,7 @@ route-map {rmap_name} permit {seq}
                     route_maps += f"\n set origin {p['origin_code']}"
 
                 if community_tag:
+                    route_maps += f"\n set community {COMMUNITY_LIST_RELATION} delete"
                     route_maps += f"\n set community {community_tag} additive"
 
                 route_maps += "\n!\n"
@@ -122,34 +122,31 @@ route-map {rmap_name} permit {seq}"""
             if default_local_pref is not None:
                 route_maps += f"\n set local-preference {default_local_pref}"
             if community_tag:
+                route_maps += f"\n set community {COMMUNITY_LIST_RELATION} delete"
                 route_maps += f"\n set community {community_tag} additive"
             route_maps += "\n!"
 
             if relation in {"peer", "provider"}:
-                if not community_lists:
-                    community_lists = f"""
-ip community-list standard {COMMUNITY_LIST_NON_CUSTOMER} permit {COMMUNITY_FROM_PEER}
-ip community-list standard {COMMUNITY_LIST_NON_CUSTOMER} permit {COMMUNITY_FROM_PROVIDER}
-ip community-list standard {COMMUNITY_LIST_CUSTOMER} permit {COMMUNITY_FROM_CUSTOMER}
-!"""
-                if not cone_prefix_list:
-                    cone_prefix_list = f"""
-ip prefix-list PFX-CONE seq 5 permit 192.168.{num}.0/24"""
-                    seq_num = 10
-                    for node in customer_cone:
-                        node_num = get_node_num(node)
-                        cone_prefix_list += (
-                            f"\n ip prefix-list PFX-CONE seq {seq_num} permit 192.168.{node_num}.0/24"
-                        )
-                        seq_num += 5
-                    cone_prefix_list += "\n!"
                 out_name = f"RM-OUT-{neighbor.upper()}"
                 neighbor_out_maps[neighbor_ip] = out_name
                 out_route_maps += f"""
+route-map {out_name} deny 5
+ match community {COMMUNITY_LIST_NON_CUSTOMER}
+!
 route-map {out_name} permit 10
- match ip address prefix-list PFX-CONE
+ match community {COMMUNITY_LIST_CUSTOMER}
 !
 route-map {out_name} deny 20
+!"""
+
+        if use_communities and not community_lists:
+            community_lists = f"""
+bgp community-list standard {COMMUNITY_LIST_RELATION} permit {COMMUNITY_FROM_CUSTOMER}
+bgp community-list standard {COMMUNITY_LIST_RELATION} permit {COMMUNITY_FROM_PEER}
+bgp community-list standard {COMMUNITY_LIST_RELATION} permit {COMMUNITY_FROM_PROVIDER}
+bgp community-list standard {COMMUNITY_LIST_NON_CUSTOMER} permit {COMMUNITY_FROM_PEER}
+bgp community-list standard {COMMUNITY_LIST_NON_CUSTOMER} permit {COMMUNITY_FROM_PROVIDER}
+bgp community-list standard {COMMUNITY_LIST_CUSTOMER} permit {COMMUNITY_FROM_CUSTOMER}
 !"""
 
         if router in rpki_routers:
@@ -168,8 +165,6 @@ route-map {rmap} deny 5
 
         if prefix_lists:
             config += prefix_lists
-        if cone_prefix_list:
-            config += cone_prefix_list
         if community_lists:
             config += community_lists
         if use_communities:
@@ -186,13 +181,15 @@ route-map {ORIGIN_ROUTE_MAP} permit 10
         config += f"""
 router bgp {router_asn}
  bgp router-id {num}.{num}.{num}.{num}
+ no bgp bestpath compare-age
+ bgp bestpath compare-routerid
  no bgp ebgp-requires-policy"""
 
         for conn in router_connections:
             neighbor = conn["neighbor"]
             neighbor_ip = conn["neighbor_ip"]
 
-            if neighbor.startswith("censor"):
+            if neighbor.lower().startswith("censor"):
                 neighbor_asn = 65900 + get_node_num(neighbor)
             else:
                 neighbor_asn = 65000 + get_node_num(neighbor)

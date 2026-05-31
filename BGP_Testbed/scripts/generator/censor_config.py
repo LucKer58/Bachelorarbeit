@@ -2,6 +2,19 @@ from collections import defaultdict
 
 from generator.core import get_node_num
 
+COMMUNITY_FROM_CUSTOMER = "65000:1"
+COMMUNITY_FROM_PEER = "65000:2"
+COMMUNITY_FROM_PROVIDER = "65000:3"
+COMMUNITY_LIST_NON_CUSTOMER = "CL-NON-CUSTOMER"
+COMMUNITY_LIST_CUSTOMER = "CL-CUSTOMER"
+COMMUNITY_LIST_RELATION = "CL-RELATION"
+ORIGIN_ROUTE_MAP = "RM-ORIGIN-CUSTOMER"
+RELATION_COMMUNITY = {
+    "customer": COMMUNITY_FROM_CUSTOMER,
+    "peer": COMMUNITY_FROM_PEER,
+    "provider": COMMUNITY_FROM_PROVIDER,
+}
+
 
 def build_censor_configs(censors, connections, policies, customer_cones=None):
     customer_cones = customer_cones or {}
@@ -16,8 +29,6 @@ def build_censor_configs(censors, connections, policies, customer_cones=None):
         use_tier_policy = bool(
             censor.get("isp_mode") or censor.get("follow_tier_policy")
         )
-        customer_cone = customer_cones.get(censor_name, [])
-
         censor_connections = connections[censor_name]
         censor_asn = 65900 + censor_num
 
@@ -54,9 +65,10 @@ interface lo
         censor_prefix_lists = ""
         censor_in_route_maps = ""
         censor_neighbor_in_rmaps = {}
-        cone_prefix_list = ""
+        community_lists = ""
         censor_out_route_maps = ""
         censor_neighbor_out_rmaps = {}
+        use_communities = False
 
         for neighbor, pols in policies_by_neighbor_censor.items():
             rmap_name = f"RM-IN-{neighbor.upper()}"
@@ -71,6 +83,9 @@ interface lo
 
             default_local_pref = None
             relation = neighbor_relationships.get(neighbor)
+            community_tag = RELATION_COMMUNITY.get(relation)
+            if community_tag and use_tier_policy:
+                use_communities = True
 
             for p in pols:
                 if p.get("match") == "all":
@@ -105,6 +120,10 @@ route-map {rmap_name} permit {seq}
                 if "origin_code" in p:
                     censor_in_route_maps += f"\n set origin {p['origin_code']}"
 
+                if community_tag and use_tier_policy:
+                    censor_in_route_maps += f"\n set community {COMMUNITY_LIST_RELATION} delete"
+                    censor_in_route_maps += f"\n set community {community_tag} additive"
+
                 censor_in_route_maps += "\n!\n"
                 seq += 10
 
@@ -112,33 +131,32 @@ route-map {rmap_name} permit {seq}
 route-map {rmap_name} permit {seq}"""
             if default_local_pref is not None:
                 censor_in_route_maps += f"\n set local-preference {default_local_pref}"
+            if community_tag and use_tier_policy:
+                censor_in_route_maps += f"\n set community {COMMUNITY_LIST_RELATION} delete"
+                censor_in_route_maps += f"\n set community {community_tag} additive"
             censor_in_route_maps += "\n!"
 
             if use_tier_policy and relation in {"peer", "provider"}:
-                if not cone_prefix_list:
-                    if prefix_type == "subprefix":
-                        attack_prefix = f"192.168.{hijack_target_num}.0/25"
-                    else:
-                        attack_prefix = f"192.168.{hijack_target_num}.0/24"
-                    cone_prefix_list = (
-                        f"\nip prefix-list PFX-CONE seq 5 permit {attack_prefix}"
-                    )
-                    seq_num = 10
-                    for node in customer_cone:
-                        node_num = get_node_num(node)
-                        cone_prefix_list += (
-                            f"\n ip prefix-list PFX-CONE seq {seq_num} permit 192.168.{node_num}.0/24"
-                        )
-                        seq_num += 5
-                    cone_prefix_list += "\n!"
-
                 out_name = f"RM-OUT-{neighbor.upper()}"
                 censor_neighbor_out_rmaps[neighbor_ip] = out_name
                 censor_out_route_maps += f"""
+route-map {out_name} deny 5
+ match community {COMMUNITY_LIST_NON_CUSTOMER}
+!
 route-map {out_name} permit 10
- match ip address prefix-list PFX-CONE
+ match community {COMMUNITY_LIST_CUSTOMER}
 !
 route-map {out_name} deny 20
+!"""
+
+        if use_communities and not community_lists:
+            community_lists = f"""
+bgp community-list standard {COMMUNITY_LIST_RELATION} permit {COMMUNITY_FROM_CUSTOMER}
+bgp community-list standard {COMMUNITY_LIST_RELATION} permit {COMMUNITY_FROM_PEER}
+bgp community-list standard {COMMUNITY_LIST_RELATION} permit {COMMUNITY_FROM_PROVIDER}
+bgp community-list standard {COMMUNITY_LIST_NON_CUSTOMER} permit {COMMUNITY_FROM_PEER}
+bgp community-list standard {COMMUNITY_LIST_NON_CUSTOMER} permit {COMMUNITY_FROM_PROVIDER}
+bgp community-list standard {COMMUNITY_LIST_CUSTOMER} permit {COMMUNITY_FROM_CUSTOMER}
 !"""
 
         if prefix_type == "subprefix":
@@ -160,7 +178,10 @@ route-map {out_name} deny 20
             static_routes += f"ip route {prefix} blackhole\n"
 
         if attack_type in ["hijack", "mitm"]:
-            networks += f"  network {prefix}\n"
+            if use_communities:
+                networks += f"  network {prefix} route-map {ORIGIN_ROUTE_MAP}\n"
+            else:
+                networks += f"  network {prefix}\n"
         else:
             networks += f"  network {prefix} route-map {attack_rmap_name}\n"
             route_maps += f"route-map {attack_rmap_name} permit 10\n"
@@ -183,14 +204,23 @@ route-map {out_name} deny 20
                 community = censor.get("community", "65535:666")
                 route_maps += f" set community {community}\n"
 
+            if use_communities:
+                route_maps += f" set community {COMMUNITY_FROM_CUSTOMER} additive\n"
+
             route_maps += "!\n"
 
         if censor_prefix_lists:
             config += f"\n{censor_prefix_lists.strip()}"
-        if cone_prefix_list:
-            config += f"\n{cone_prefix_list.strip()}"
+        if community_lists:
+            config += f"\n{community_lists.strip()}"
         if static_routes:
             config += f"\n{static_routes.strip()}"
+        if use_communities:
+            config += f"""
+!
+route-map {ORIGIN_ROUTE_MAP} permit 10
+ set community {COMMUNITY_FROM_CUSTOMER} additive
+!"""
         if route_maps:
             config += f"\n!\n{route_maps.strip()}"
         if censor_in_route_maps:
@@ -202,11 +232,13 @@ route-map {out_name} deny 20
 !
 router bgp {censor_asn}
  bgp router-id 9{censor_num}.9{censor_num}.9{censor_num}.9{censor_num}
+ no bgp bestpath compare-age
+ bgp bestpath compare-routerid
  no bgp ebgp-requires-policy"""
 
         for conn in censor_connections:
             neighbor = conn["neighbor"]
-            if neighbor.startswith("censor"):
+            if neighbor.lower().startswith("censor"):
                 neighbor_asn = 65900 + get_node_num(neighbor)
             else:
                 neighbor_asn = 65000 + get_node_num(neighbor)
@@ -226,7 +258,7 @@ router bgp {censor_asn}
                 rmap = censor_neighbor_in_rmaps[conn["neighbor_ip"]]
                 config += f"\n  neighbor {conn['neighbor_ip']} route-map {rmap} in"
 
-            if attack_type in ["blackhole", "mitm"]:
+            if use_communities or attack_type in ["blackhole", "mitm"]:
                 config += f"""
   neighbor {conn['neighbor_ip']} send-community both"""
 

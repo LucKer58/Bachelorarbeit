@@ -76,10 +76,7 @@ def build_tier_policies(data, links):
                 pref = provider_pref
                 relationship = "provider"
             else:
-                if peer_pref == 100:
-                    relationship = "peer"
-                else:
-                    relationship = "peer"
+                relationship = "peer"
                 pref = peer_pref
 
             policies.append(

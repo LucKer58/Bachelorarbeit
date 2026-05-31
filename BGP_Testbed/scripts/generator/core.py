@@ -129,7 +129,7 @@ def write_roas(routers):
         r_num = get_node_num(r)
         roas_data["roas"].append(
             {
-                "asn": f"AS6500{r_num}",
+                "asn": f"AS{65000 + r_num}",
                 "prefix": f"192.168.{r_num}.0/24",
                 "maxLength": 24,
                 "ta": "Testbed",
