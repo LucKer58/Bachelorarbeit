@@ -27,3 +27,8 @@ scenarios/random_runs
 # Betriebssystem
 .DS_Store
 Thumbs.db
+
+# Lokale Dokumentation/Notizen
+implementation.tex
+CLAUDE.md
+

@@ -75,10 +75,6 @@ tier_policy:
     peer: 100
     provider: 50
 
-# ========== LINKS ==========
-# Tier-1 full mesh (peer-to-peer)
-# Tier-2 dual-homed to Tier-1 (provider-customer)
-# Tier-3 to Tier-2 (provider-customer)
 links:
 # Tier-1 mesh
 - [AS1, AS2]
@@ -129,7 +125,4 @@ links:
 - [AS29, AS8]
 - [AS30, AS9]
 
-# ========== POLICIES ==========
-# Static policy overrides (optional). Tier-based local-pref is applied
-# automatically when tiers + tier_policy are set above.
 policies: []

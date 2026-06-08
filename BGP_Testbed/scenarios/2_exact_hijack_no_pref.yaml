@@ -1,33 +1,21 @@
 name: bgp-testbed
 
-# ========== ROUTER ==========
-# AS1 = Opfer (Inland)
-# AS2 = Transit
-# AS3 = Ziel (Ausland)
 routers:
 - AS1
 - AS2
 - AS3
 - AS4
 
-# ========== LINKS ==========
 links:
 - [AS1, AS2]
 - [AS2, AS3]
 - [AS1, censor1]
 - [AS3, AS4]
 
-# ========== ZENSOREN ==========
 censors:
 - name: censor1
   target_router: AS4
   attack_type: hijack
   prefix_type: exact
 
-# ========== POLICIES ==========
 policies: []
-
-# ERWARTETES RESULTAT:
-# AS1 wählt Censor1. Beide bieten ein /24 Prefix an, aber der Zensor 
-# ist näher (1 Hop über censor1 vs. 2 Hops über AS2->AS3).
-# Die Zensur gewinnt "natürlich" durch den kürzeren AS-Path.

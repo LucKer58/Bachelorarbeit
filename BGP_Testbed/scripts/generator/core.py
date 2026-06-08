@@ -3,6 +3,14 @@ import re
 import shutil
 import yaml
 
+# Container images are pinned by digest for reproducibility: a thesis result must
+# rebuild on the exact same FRR/gortr bytes, and `:latest` is a moving tag. These
+# digests are the images that were already running in this testbed (the locally
+# cached frrouting/frr:latest and cloudflare/gortr:latest). To bump a version,
+# pull the new image and replace the digest below.
+FRR_IMAGE = "frrouting/frr@sha256:990e83490108b686fd6df3b1cafa6bdbb2714acb00eedb9a89693946f46f45ce"
+GORTR_IMAGE = "cloudflare/gortr@sha256:0de53fef38978311cf599dc9779804424bc9ceca7a9dede3a3c2d18f19154e41"
+
 
 def ensure_repo_root():
     bash_dir = os.path.dirname(
@@ -89,7 +97,7 @@ def write_lab_file(data, routers, censors, rpki_routers, link_details):
         num = get_node_num(router)
         topology["topology"]["nodes"][router] = {
             "kind": "linux",
-            "image": "frrouting/frr:latest",
+            "image": FRR_IMAGE,
             "binds": [
                 f"./configs/frr{num}.conf:/etc/frr/frr.conf",
                 "../configs/daemons:/etc/frr/daemons",
@@ -100,7 +108,7 @@ def write_lab_file(data, routers, censors, rpki_routers, link_details):
         censor_name = censor["name"]
         topology["topology"]["nodes"][censor_name] = {
             "kind": "linux",
-            "image": "frrouting/frr:latest",
+            "image": FRR_IMAGE,
             "binds": [
                 f"./configs/{censor_name}.conf:/etc/frr/frr.conf",
                 "../configs/daemons:/etc/frr/daemons",
@@ -110,7 +118,7 @@ def write_lab_file(data, routers, censors, rpki_routers, link_details):
     if rpki_routers:
         topology["topology"]["nodes"]["rpki-validator"] = {
             "kind": "linux",
-            "image": "cloudflare/gortr",
+            "image": GORTR_IMAGE,
             "cmd": "-bind :3323 -cache /roas.json -verify=false -checktime=false",
             "binds": ["./configs/roas.json:/roas.json:ro"],
         }

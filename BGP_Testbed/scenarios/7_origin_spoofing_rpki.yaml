@@ -1,35 +1,22 @@
 name: bgp-testbed
 
-# ========== ROUTER ==========
-# AS1 = Lokaler ISP (Opfer-Netzwerk)
-# AS2 = Großer Transit-Provider (mit RPKI geschützt)
-# AS3 = Ziel-Router im Ausland (Das eigentliche Ziel, ASN 65003)
 routers:
 - AS1
 - AS2
 - AS3
 - AS4
 
-# ========== RPKI ROUTER ==========
-# Router 2 validiert Routen kryptografisch.
-# RPKI prüft NUR die letzte ASN im Pfad (die Origin-ASN)!
 rpki_routers:
 - AS1
 
-# ========== LINKS ==========
 links:
 - [AS1, AS2]
 - [AS2, AS3]
 - [AS3, AS4]
 - [AS1, censor1]
 
-# ========== ZENSOREN ==========
 censors:
 - name: censor1
   target_router: AS4
-  # Der Zensor fälscht gezielt die HERKUNFT (Origin) der Route.
-  # Anstatt das Netz 192.168.3.0/24 als sein eigenes (ASN 65901) anzukündigen,
-  # behauptet der Zensor in der BGP-Message: "Die Route stammt von ASN 65003 (dem echten Ziel), und ich (65901) leite sie nur weiter."
-  # Das Skript fügt dafür "65003" an das Ende (!) des AS-Pfads an.
   attack_type: origin_spoofing
   prefix_type: exact

@@ -30,7 +30,7 @@ SCENARIO_SPECS = [
     "4_exact_hijack_with_defense",
     "5_path_poisoning",
     "6_rpki_test",
-    "7_origin_spoofing_rpki",
+    "7_origin_spoofing",
     "8_path_forgery",
     "9_mitm_attack",
     "10_origin_code_manipulation",
@@ -300,6 +300,8 @@ def build_scenario(
             censor_config["poison_asn"] = poison_asn
     elif scenario_id == "6_rpki_test":
         rpki_routers = [node for node in tiers.get("tier1", []) if node != censor_name]
+    elif scenario_id == "7_origin_spoofing":
+        censor_config["attack_type"] = "origin_spoofing"
     elif scenario_id == "8_path_forgery":
         censor_config["attack_type"] = "as_path_forgery"
         if fake_path:
@@ -319,13 +321,6 @@ def build_scenario(
                     "origin_code": "incomplete",
                 }
             )
-    elif scenario_id == "7_origin_spoofing_rpki":
-        # Origin spoofing forges the victim's real origin ASN, so the route is
-        # RPKI-valid: ROV cannot drop it. Deploying RPKI here (same routers as
-        # 6_rpki_test) demonstrates the evasion -- the hijack rate stays high,
-        # unlike 6_rpki_test where RPKI drops the wrong-origin hijack.
-        censor_config["attack_type"] = "origin_spoofing"
-        rpki_routers = [node for node in tiers.get("tier1", []) if node != censor_name]
 
     scenario = {
         "name": base["name"],

@@ -1,0 +1,6 @@
+# Dependencies for scripts/aggregate_results.py only (tables + figures).
+# The testbed runtime itself needs just PyYAML; these are kept separate so the
+# generator/evaluator path stays stdlib + PyYAML.
+pandas>=2.0
+matplotlib>=3.7
+seaborn>=0.12

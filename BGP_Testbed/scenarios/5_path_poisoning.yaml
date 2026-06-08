@@ -1,25 +1,19 @@
 name: bgp-testbed
 
-# ========== ROUTER ==========
-# AS1 = Inlands-Router (Bürger des Landes)
-# AS2 = Grenz-Router (Transit ins Ausland)
-# AS3 = Ziel-Router im Ausland (Das Opfer, z.B. Twitter)
 routers:
 - AS1
 - AS2
 - AS3
 
-# ========== LINKS ==========
 links:
-- [AS1, AS2]   # Inland ist mit der Grenze verbunden
-- [AS2, AS3]   # Grenze ist mit dem Ausland verbunden
-- [AS1, censor1]   # Zensor hängt am Inlands-Router
+- [AS1, AS2]
+- [AS2, AS3]
+- [AS1, censor1]
 
-# ========== ZENSOREN ==========
 censors:
 - name: censor1
   target_router: AS3
   attack_type: as_path_poisoning
   prefix_type: subprefix
-  poison_asn: 65002    # Die ASN des Grenz-Routers (AS2)
+  poison_asn: 65002
 

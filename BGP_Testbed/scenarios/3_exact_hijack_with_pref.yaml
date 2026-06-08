@@ -1,36 +1,23 @@
 name: bgp-testbed
 
-# ========== ROUTER ==========
-# AS1 = Opfer (Inland)
-# AS2 = Transit
-# AS3 = Ziel (Ausland)
 routers:
 - AS1
 - AS2
 - AS3
 
-# ========== LINKS ==========
 links:
 - [AS1, AS2]
 - [AS2, AS3]
 - [AS1, censor1]
 
-# ========== ZENSOREN ==========
 censors:
 - name: censor1
   target_router: AS3
   attack_type: hijack
   prefix_type: exact
 
-# ========== POLICIES ==========
 policies:
-# Wir erhöhen künstlich die BGP-Priorität für den legitimen Pfad über AS2
 - node: AS1
   neighbor: AS2
   target_node: AS3
   local_preference: 300
-
-# ERWARTETES RESULTAT:
-# AS1 wählt AS2 (den echten Weg). Obwohl der Zensor näher ist (1 Hop),
-# schlägt die künstliche Local Preference von 300 den AS-Path-Längen-Check.
-# Der Hijack ist fehlgeschlagen, Nutzer surfen sicher.

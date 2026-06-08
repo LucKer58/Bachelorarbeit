@@ -16,10 +16,10 @@ SCENARIO_SPECS = [
     "4_exact_hijack_with_defense",
     "5_path_poisoning",
     "6_rpki_test",
-    "7_origin_spoofing_rpki",
     "8_path_forgery",
     "9_mitm_attack",
     "10_origin_code_manipulation",
+    "11_origin_spoofing_rpki",
 ]
 
 SUMMARY_RE = re.compile(

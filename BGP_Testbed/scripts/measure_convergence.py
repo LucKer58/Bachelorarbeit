@@ -277,12 +277,27 @@ def hijacked_count(observers, origin_prefix, hijack_prefix, censor_asns, pool) -
     return sum(1 for b in bests if path_is_censored(b, censor_asns))
 
 
-def arm_hijack(observers, origin_prefix, hijack_prefix, censor_asns, pool, timeout, poll) -> int:
-    """Wait until at least one observer sees the hijack again. Returns hijacked count."""
+def arm_hijack(observers, origin_prefix, hijack_prefix, censor_asns, pool, timeout, poll, stable_checks) -> int:
+    """Wait until the hijack has fully propagated, then return the hijacked count.
+
+    Returning as soon as count > 0 would snapshot the baseline mid-propagation: after
+    the censor re-arms, the hijack spreads outward AS-by-AS, so the affected set keeps
+    growing for a moment. We instead wait until the count stops increasing for
+    `stable_checks` consecutive polls so every run baselines at the same converged set.
+    """
     start = time.monotonic()
+    last = -1
+    stable = 0
     while True:
         count = hijacked_count(observers, origin_prefix, hijack_prefix, censor_asns, pool)
-        if count > 0 or time.monotonic() - start > timeout:
+        if count > 0 and count == last:
+            stable += 1
+            if stable >= stable_checks:
+                return count
+        else:
+            stable = 0
+        last = count
+        if time.monotonic() - start > timeout:
             return count
         time.sleep(poll)
 
@@ -453,7 +468,7 @@ def main() -> int:
                 observers = make_observers()
                 armed = arm_hijack(
                     observers, origin_prefix, hijack_prefix, censor_asns, pool,
-                    args.arm_timeout, args.poll,
+                    args.arm_timeout, args.poll, args.stable_checks,
                 )
                 if armed == 0:
                     print(f"  run {run}: no observer is hijacked (defense effective / not converged) "

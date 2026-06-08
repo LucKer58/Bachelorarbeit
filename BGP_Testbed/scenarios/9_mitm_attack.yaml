@@ -1,43 +1,23 @@
 name: bgp-testbed
 
-# ========== ROUTER ==========
-# AS1 = Opfer (Inland)
-# AS2 = Transit
-# AS3 = Ziel (Ausland)
 routers:
 - AS1
 - AS2
 - AS3
 - AS4
 
-# ========== LINKS ==========
-# WICHTIG: Für einen MitM-Angriff muss der Zensor ZWISCHEN Opfer und Ziel sitzen.
-# Der Zensor hat hier also eine Verbindung nach Hause (AS1) UND nach draußen (AS2).
 links:
 - [AS1, AS2]
 - [AS2, AS3]
 - [AS1, censor1]
 - [censor1, AS2]
-- [AS3, AS4]    # NEU: Der Zensor kann Pakete weiterleiten!
+- [AS3, AS4]
 
-# ========== ZENSOREN ==========
 censors:
 - name: censor1
   target_router: AS4
   attack_type: mitm
   prefix_type: subprefix
-  # Der Knoten, an den der Zensor die belauschten Pakete schicken soll, 
-  # statt sie wie bei "hijack" oder "blackhole" wegzuwerfen.
   mitm_forward_node: AS2 
 
-# ========== POLICIES ==========
 policies: []
-
-# ERWARTETES RESULTAT:
-# 1. Censor1 kündigt das spezifischere /25 Netz an ROUTER 1 an (Opfer).
-# 2. Censor1 kündigt das /25 Netz explizit NICHT an ROUTER 2 an (Export Filter),
-#    um eine Routing-Schleife (Loop) zu vermeiden.
-# 3. Router 1 schickt den Traffic von Router 3 nun an Censor1.
-# 4. Censor1 hat eine statische Route, die diesen Traffic zu Router 2 schickt.
-# 5. Router 2 leitet die Pakete basierend auf seiner echten /24 Route an Router 3.
-# Resultat: Traffic kommt am Ziel an, aber Censor 1 liest alles mit.
