@@ -74,17 +74,11 @@ tier_policy:
     peer: 100
     provider: 50
 
-# ========== LINKS ==========
-# Tier-1 full mesh (peer-to-peer)
-# Tier-2 dual-homed to Tier-1 (provider-customer)
-# Tier-3 to Tier-2 (provider-customer)
 links:
-# Tier-1 mesh
 - [Censor1, AS2]
 - [Censor1, AS3]
 - [AS2, AS3]
 
-# Tier-2 dual-homing
 - [AS4, Censor1]
 - [AS4, AS2]
 - [AS5, Censor1]
@@ -100,7 +94,6 @@ links:
 - [AS10, Censor1]
 - [AS10, AS2]
 
-# Tier-2 to tier-2
 - [AS4, AS9]
 - [AS4, AS10]
 - [AS9, AS6]
@@ -109,7 +102,6 @@ links:
 - [AS5, AS7]
 - [AS7, AS10]
 
-# Tier-3 to Tier-2
 - [AS11, AS4]
 - [AS12, AS4]
 - [AS12, AS5]
@@ -144,7 +136,4 @@ censors:
   prefix_type: subprefix
   isp_mode: true
 
-# ========== POLICIES ==========
-# Static policy overrides (optional). Tier-based local-pref is applied
-# automatically when tiers + tier_policy are set above.
 policies: []
