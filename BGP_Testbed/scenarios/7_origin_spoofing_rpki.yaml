@@ -6,18 +6,17 @@ routers:
 - AS3
 - AS4
 
+rpki_routers:
+- AS1
+
 links:
 - [AS1, AS2]
 - [AS2, AS3]
-- [AS1, censor1]
-- [censor1, AS2]
 - [AS3, AS4]
+- [AS1, censor1]
 
 censors:
 - name: censor1
   target_router: AS4
-  attack_type: mitm
-  prefix_type: subprefix
-  mitm_forward_node: AS2 
-
-policies: []
+  attack_type: origin_spoofing
+  prefix_type: exact

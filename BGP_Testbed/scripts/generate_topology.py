@@ -1,577 +1,213 @@
 import argparse
 import os
-import shutil
+import re
 import subprocess
 import yaml
 
-# Change this if you want a different default scenario without passing CLI args.
-DEFAULT_SCENARIO = "scenarios/1_subprefix_hijack.yaml"
-
-parser = argparse.ArgumentParser(description="Generate Containerlab topology and configs.")
-parser.add_argument(
-    "--scenario",
-    default=DEFAULT_SCENARIO,
-    help="Path to the scenario YAML (relative to repo root or absolute).",
+from generator.censor_config import build_censor_configs
+from generator.core import (
+    build_connections,
+    ensure_repo_root,
+    load_scenario,
+    reset_generated_dir,
+    resolve_scenario_path,
+    write_lab_file,
+    write_roas,
 )
-parser.add_argument(
-    "--no-deploy",
-    action="store_true",
-    help="Only generate files; do not run containerlab deploy.",
-)
-parser.add_argument(
-    "--sudo",
-    action="store_true",
-    help="Run containerlab deploy with sudo.",
-)
-parser.add_argument(
-    "--no-graph",
-    action="store_true",
-    help="Do not generate the containerlab graph.",
-)
-parser.add_argument(
-    "--no-hard-clean",
-    action="store_true",
-    help="Skip force-removal of lab containers before deploy.",
-)
-args = parser.parse_args()
-
-# Wechsle in das Verzeichnis BGP_Testbed, in dem sich die Ordner 'scenarios' und 'generated' befinden
-bash_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.chdir(bash_dir)
-
-scenario_path = args.scenario
-if not os.path.isabs(scenario_path):
-    scenario_path = os.path.join(bash_dir, scenario_path)
-if not os.path.exists(scenario_path):
-    raise FileNotFoundError(f"Scenario file not found: {scenario_path}")
-
-if os.path.exists('generated'):
-    shutil.rmtree('generated')
-os.makedirs('generated/configs', exist_ok=True)
-
-with open(scenario_path, 'r') as f:
-    data = yaml.safe_load(f)
-
-routers = data['routers']  # ['router1', 'router2', 'router3', 'router4']
-censors = data.get('censors', [])  # [{'name': 'censor1', 'target_router': 'router1', ...}]
-rpki_routers = data.get('rpki_routers', [])  # Neu: Router, die RPKI nutzen sollen
-links = data['links']  # [['router1', 'router2'], ...]
-policies = data.get('policies', [])
-
-all_nodes = routers + [c['name'] for c in censors]
-
-connections = {node: [] for node in all_nodes}
-interface_counter = {node: 1 for node in all_nodes}  # eth1, eth2, ...
-
-link_details = []  # Speichert IP-Adressen pro Link
-
-for link_num, link in enumerate(links):
-    node_a, node_b = link
-    
-    # Interface-Nummern
-    eth_a = interface_counter[node_a]
-    eth_b = interface_counter[node_b]
-    interface_counter[node_a] += 1
-    interface_counter[node_b] += 1
-    
-    # IP-Adressen: 10.0.X.1/30 und 10.0.X.2/30
-    ip_a = f"10.0.{link_num}.1/30"
-    ip_b = f"10.0.{link_num}.2/30"
-    
-    # Speichern
-    connections[node_a].append({
-        'neighbor': node_b,
-        'interface': f'eth{eth_a}',
-        'ip': ip_a,
-        'neighbor_ip': ip_b.split('/')[0]
-    })
-    
-    connections[node_b].append({
-        'neighbor': node_a,
-        'interface': f'eth{eth_b}',
-        'ip': ip_b,
-        'neighbor_ip': ip_a.split('/')[0]
-    })
-    
-    link_details.append({
-        'endpoints': [f"{node_a}:eth{eth_a}", f"{node_b}:eth{eth_b}"]
-    })
-
-os.makedirs('generated/configs', exist_ok=True)
-
-# ========== 1. LAB.CLAB.YAML ==========
-topology = {
-    'name': data['name'],
-    'topology': {
-        'nodes': {},
-        'links': []
-    }
-}
-
-# ROUTER NODES
-for router in routers:
-    num = int(router.replace('router', ''))
-    topology['topology']['nodes'][router] = {
-        'kind': 'linux',
-        'image': 'frrouting/frr:latest',
-        'binds': [
-            f'./configs/frr{num}.conf:/etc/frr/frr.conf',
-            '../configs/daemons:/etc/frr/daemons'
-        ]
-    }
-
-# CENSOR NODES (FRR)
-for censor in censors:
-    censor_name = censor['name']
-    
-    topology['topology']['nodes'][censor_name] = {
-        'kind': 'linux',
-        'image': 'frrouting/frr:latest',
-        'binds': [
-            f'./configs/{censor_name}.conf:/etc/frr/frr.conf',
-            '../configs/daemons:/etc/frr/daemons'
-        ]
-    }
-
-# RPKI VALIDATOR (GoRTR)
-if rpki_routers:
-    topology['topology']['nodes']['rpki-validator'] = {
-        'kind': 'linux',
-        'image': 'cloudflare/gortr',
-        'cmd': '-bind :3323 -cache /roas.json -verify=false -checktime=false',
-        'binds': [
-            './configs/roas.json:/roas.json:ro'
-        ]
-    }
-
-# LINKS
-topology['topology']['links'] = link_details
-
-# Schreiben
-with open('generated/lab.clab.yaml', 'w') as f:
-    yaml.dump(topology, f, default_flow_style=False, sort_keys=False)
-
-# RPKI ROAs (JSON) generieren
-if rpki_routers:
-    import json
-    roas_data = {"roas": []}
-    for r in routers:
-        r_num = int(r.replace('router', ''))
-        roas_data["roas"].append({
-            "asn": f"AS6500{r_num}",
-            "prefix": f"192.168.{r_num}.0/24",
-            "maxLength": 24,
-            "ta": "Testbed"
-        })
-    with open('generated/configs/roas.json', 'w') as f:
-        json.dump(roas_data, f, indent=2)
+from generator.deploy import run_deploy
+from generator.router_config import build_router_configs
 
 
-# ========== 2. ROUTER CONFIGS ==========
-from collections import defaultdict
-
-for router in routers:
-    num = int(router.replace('router', ''))
-    router_connections = connections[router]
-    my_policies = [p for p in policies if p['node'] == router]
-    
-    config = f"""frr defaults traditional
-!
-hostname {router}
-!"""
-    
-    if router in rpki_routers:
-        config += """
-rpki
- rpki polling_period 10
- rpki cache rpki-validator 3323 preference 1
- exit
-!"""
-    
-    # Interfaces
-    for conn in router_connections:
-        config += f"""
-interface {conn['interface']}
- ip address {conn['ip']}
-!"""
-    
-    # Loopback
-    config += f"""
-interface lo
- ip address 192.168.{num}.1/24
-!"""
-    
-    # Policies
-    policies_by_neighbor = defaultdict(list)
-    for p in my_policies:
-        policies_by_neighbor[p['neighbor']].append(p)
-
-    prefix_lists = ""
-    route_maps = ""
-    neighbor_route_maps = {}
-
-    for neighbor, pols in policies_by_neighbor.items():
-        rmap_name = f"RM-IN-{neighbor.upper()}"
-        seq = 10
-        neighbor_ip = next((c['neighbor_ip'] for c in router_connections if c['neighbor'] == neighbor), None)
-        if not neighbor_ip: continue
-        
-        neighbor_route_maps[neighbor_ip] = rmap_name
-        
-        for p in pols:
-            target = p['target_node']
-            target_num = int(target.replace('router', ''))
-            plist_name = f"PFX-{target.upper()}"
-            
-            if f"ip prefix-list {plist_name}" not in prefix_lists:
-                 prefix_lists += f"""
-ip prefix-list {plist_name} seq 5 permit 192.168.{target_num}.0/24
-!"""
-            
-            route_maps += f"""
-route-map {rmap_name} permit {seq}
- match ip address prefix-list {plist_name}"""
-            
-            if 'local_preference' in p:
-                route_maps += f"\n set local-preference {p['local_preference']}"
-            
-            if 'prepend_asn' in p:
-                prepend_count = p.get('prepend_count', 3)
-                prepend = " ".join([str(p['prepend_asn'])] * prepend_count)
-                route_maps += f"\n set as-path prepend {prepend}"
-                
-            if 'origin_code' in p:
-                route_maps += f"\n set origin {p['origin_code']}"
-                
-            route_maps += "\n!\n"
-            seq += 10
-            
-        route_maps += f"""
-route-map {rmap_name} permit {seq}
-!"""
-
-    if router in rpki_routers:
-        # Standard-Routemap für RPKI (falls keine spezifischen Policies existieren)
-        rpki_route_maps = f"""
-route-map RM-RPKI-IN deny 10
- match rpki invalid
-!
-route-map RM-RPKI-IN permit 20
-!"""
-        # Inject RPKI deny rule into all existing policy route-maps
-        for rmap in set(neighbor_route_maps.values()):
-            rpki_route_maps += f"""
-route-map {rmap} deny 5
- match rpki invalid
-!"""
-        route_maps = rpki_route_maps + route_maps
-
-    if prefix_lists:
-        config += prefix_lists
-    if route_maps:
-        config += route_maps
-    
-    # BGP
-    router_asn = 65000 + num
-    config += f"""
-router bgp {router_asn}
- bgp router-id {num}.{num}.{num}.{num}
- no bgp ebgp-requires-policy"""
-    
-    # Neighbors
-    for conn in router_connections:
-        neighbor = conn['neighbor']
-        neighbor_ip = conn['neighbor_ip']
-        
-        if neighbor.startswith('router'):
-            neighbor_asn = 65000 + int(neighbor.replace('router', ''))
-        elif neighbor.startswith('censor'):
-            neighbor_asn = 65900 + int(neighbor.replace('censor', ''))
-        
-        config += f"""
- neighbor {neighbor_ip} remote-as {neighbor_asn}"""
-    
-    # Address family
-    config += f"""
- !
- address-family ipv4 unicast
-  network 192.168.{num}.0/24"""
-    
-    for conn in router_connections:
-        config += f"""
-  neighbor {conn['neighbor_ip']} activate"""
-    
-    # Route-map assignment
-    for nip, rmap in neighbor_route_maps.items():
-        config += f"""
-  neighbor {nip} route-map {rmap} in"""
-
-    if router in rpki_routers:
-        for conn in router_connections:
-            if conn['neighbor_ip'] not in neighbor_route_maps:
-                config += f"""
-  neighbor {conn['neighbor_ip']} route-map RM-RPKI-IN in"""
-
-    config += """
- exit-address-family
-!
-!
-"""
-    
-    # Schreiben
-    with open(f'generated/configs/frr{num}.conf', 'w') as f:
-        f.write(config)
+DEFAULT_SCENARIO = "scenarios/2_exact_hijack_no_pref.yaml"
 
 
-# ========== 3. CENSOR CONFIGS ==========
-for censor in censors:
-    censor_name = censor['name']
-    censor_num = int(censor_name.replace('censor', ''))
-    target_router = censor['target_router']
-    target_num = int(target_router.replace('router', ''))
-    attack_type = censor['attack_type']
-    
-    censor_connections = connections[censor_name]
-    censor_asn = 65900 + censor_num
-    
-    config = f"""frr defaults traditional
-!
-hostname {censor_name}
-!"""
+def write_scenario_snapshot(data, scenario_path, repo_root):
+    rel_path = os.path.relpath(scenario_path, repo_root)
+    snapshot = {"meta": {"source": rel_path}, "scenario": data}
+    with open("generated/scenario.yaml", "w") as handle:
+        yaml.safe_dump(snapshot, handle, sort_keys=False)
 
-    for conn in censor_connections:
-        config += f"""
-interface {conn['interface']}
- ip address {conn['ip']}
-!"""
-    
-    # Loopback
-    config += f"""
-interface lo
- ip address 10.255.255.{censor_num}/32
-!"""
 
-    # Static routes for hijacked prefixes und Modulare Angriffs-Logik
-    static_routes = ""
-    networks = ""
-    route_maps = ""
-    attack_rmap_name = f"RM-ATTACK-{attack_type.upper()}"
-    has_rmap = False
-    
-    my_censor_policies = [p for p in policies if p['node'] == censor_name]
-    policies_by_neighbor_censor = defaultdict(list)
-    for p in my_censor_policies:
-        policies_by_neighbor_censor[p['neighbor']].append(p)
+def build_tier_policies(data, links):
+    tiers = data.get("tiers")
+    policy_cfg = data.get("tier_policy", {})
+    if not tiers or not policy_cfg:
+        return []
 
-    censor_prefix_lists = ""
-    censor_in_route_maps = ""
-    censor_neighbor_in_rmaps = {}
+    model = policy_cfg.get("model", "gao-rexford")
+    if model != "gao-rexford":
+        return []
 
-    for neighbor, pols in policies_by_neighbor_censor.items():
-        rmap_name = f"RM-IN-{neighbor.upper()}"
-        seq = 10
-        neighbor_ip = next((c['neighbor_ip'] for c in censor_connections if c['neighbor'] == neighbor), None)
-        if not neighbor_ip: continue
-        
-        censor_neighbor_in_rmaps[neighbor_ip] = rmap_name
-        
-        for p in pols:
-            target = p['target_node']
-            target_num = int(target.replace('router', ''))
-            plist_name = f"PFX-{target.upper()}"
-            
-            if f"ip prefix-list {plist_name}" not in censor_prefix_lists:
-                 censor_prefix_lists += f"""
-ip prefix-list {plist_name} seq 5 permit 192.168.{target_num}.0/24
-!"""
-            
-            censor_in_route_maps += f"""
-route-map {rmap_name} permit {seq}
- match ip address prefix-list {plist_name}"""
-            
-            if 'local_preference' in p:
-                censor_in_route_maps += f"\n set local-preference {p['local_preference']}"
-            
-            if 'prepend_asn' in p:
-                prepend_count = p.get('prepend_count', 3)
-                prepend = " ".join([str(p['prepend_asn'])] * prepend_count)
-                censor_in_route_maps += f"\n set as-path prepend {prepend}"
-                
-            if 'origin_code' in p:
-                censor_in_route_maps += f"\n set origin {p['origin_code']}"
-                
-            censor_in_route_maps += "\n!\n"
-            seq += 10
-            
-        censor_in_route_maps += f"""
-route-map {rmap_name} permit {seq}
-!"""
-
-    # 1. PRÄFIX BESTIMMEN
-    # Wir erwarten entweder 'subprefix' oder 'exact' (Standard: 'exact').
-    # Die Angriffsart (attack_type) entscheidet NUR noch über die BGP-Attribute (Route-Maps).
-    prefix_type = censor.get('prefix_type', 'exact')
-            
-    if prefix_type == 'subprefix':
-        prefix = f"192.168.{target_num}.0/25"
-    else:
-        prefix = f"192.168.{target_num}.0/24"
-        
-    mitm_forward_node = censor.get('mitm_forward_node')
-    if attack_type == 'mitm' and mitm_forward_node:
-        # Finde die IP des Forward-Nodes für die statische Route
-        forward_ip = "blackhole"
-        for conn in censor_connections:
-            if conn['neighbor'] == mitm_forward_node:
-                forward_ip = conn['neighbor_ip']
-        if forward_ip != "blackhole":
-            static_routes += f"ip route {prefix} {forward_ip}\n"
+    tier_map = {}
+    for key, routers in tiers.items():
+        if isinstance(key, int):
+            tier_num = key
         else:
-            static_routes += f"ip route {prefix} blackhole\n"
-    else:
-        static_routes += f"ip route {prefix} blackhole\n"
+            match = re.search(r"\d+", str(key))
+            if not match:
+                continue
+            tier_num = int(match.group(0))
+        for router in routers:
+            tier_map[router] = tier_num
 
-    # 2. BGP-ATTRIBUTE MANIPULIEREN
-    # Standard-Hijacks ohne spezielle BGP-Attribute
-    if attack_type in ['hijack', 'mitm']:
-        # Kein spezielles BGP-Attribut, einfach nur ankündigen
-        networks += f"  network {prefix}\n"
-    else:
-        # Route-Map für BGP-Manipulationen wird benötigt
-        networks += f"  network {prefix} route-map {attack_rmap_name}\n"
-        route_maps += f"route-map {attack_rmap_name} permit 10\n"
-        has_rmap = True
-        
-        if attack_type == 'as_path_poisoning':
-            poison_asn = censor.get('poison_asn', 65000 + target_num)
-            route_maps += f" set as-path prepend {poison_asn}\n"
-            
-        elif attack_type == 'as_path_forgery':
-            fake_path = censor.get('fake_path', f'65004 65003')
-            route_maps += f" set as-path prepend {fake_path}\n"
-            
-        elif attack_type == 'origin_spoofing':
-            target_asn = 65000 + target_num
-            route_maps += f" set as-path prepend {target_asn}\n"
-        elif attack_type == 'origin_code_manipulation':
-            origin_code = censor.get('origin_code', 'incomplete')
-            route_maps += f" set origin {origin_code}\n"
-        elif attack_type == 'blackhole':
-            community = censor.get('community', '65535:666')
-            route_maps += f" set community {community}\n"
-            
-        route_maps += "!\n"
+    neighbors = {router: set() for router in tier_map}
+    for node_a, node_b in links:
+        if node_a in neighbors:
+            neighbors[node_a].add(node_b)
+        if node_b in neighbors:
+            neighbors[node_b].add(node_a)
 
-    if censor_prefix_lists:
-        config += f"\n{censor_prefix_lists.strip()}"
-    if static_routes:
-        config += f"\n{static_routes.strip()}"
-    if route_maps:
-        config += f"\n!\n{route_maps.strip()}"
-    if censor_in_route_maps:
-        config += f"\n!\n{censor_in_route_maps.strip()}"
+    local_prefs = policy_cfg.get("local_pref", {})
+    customer_pref = local_prefs.get("customer", 200)
+    peer_pref = local_prefs.get("peer", 100)
+    provider_pref = local_prefs.get("provider", 50)
 
-    # BGP
-    config += f"""
-!
-router bgp {censor_asn}
- bgp router-id 9{censor_num}.9{censor_num}.9{censor_num}.9{censor_num}
- no bgp ebgp-requires-policy"""
-
-    # Neighbors
-    for conn in censor_connections:
-        neighbor = conn['neighbor']
-        if neighbor.startswith('router'):
-            neighbor_asn = 65000 + int(neighbor.replace('router', ''))
-        elif neighbor.startswith('censor'):
-            neighbor_asn = 65900 + int(neighbor.replace('censor', ''))
-        config += f"""
- neighbor {conn['neighbor_ip']} remote-as {neighbor_asn}"""
-
-    # Address family
-    config += f"""
- !
- address-family ipv4 unicast"""
-    if networks:
-        config += "\n" + networks.rstrip()
-    
-    for conn in censor_connections:
-        if has_rmap and attack_type in ['as_path_prepending', 'blackhole'] and False: # Apply to network, not neighbor
-            pass
-        config += f"""
-  neighbor {conn['neighbor_ip']} activate"""
-        if conn['neighbor_ip'] in censor_neighbor_in_rmaps:
-            rmap = censor_neighbor_in_rmaps[conn['neighbor_ip']]
-            config += f"\n  neighbor {conn['neighbor_ip']} route-map {rmap} in"
-            
-        # If we wanted to send community, we need `neighbor X.X.X.X send-community both`
-        if attack_type in ['blackhole', 'mitm']:
-            config += f"""
-  neighbor {conn['neighbor_ip']} send-community both"""
-
-        # Wenn der Zensor als MitM fungiert, darf er die manipulierte Fake-Route nicht seinem Forward-Node ankündigen!
-        if attack_type == 'mitm':
-            if mitm_forward_node == conn['neighbor']:
-                config += f"\n  neighbor {conn['neighbor_ip']} route-map RM-NO-MITM out\n"
+    policies = []
+    for router, router_neighbors in neighbors.items():
+        router_tier = tier_map[router]
+        for neighbor in router_neighbors:
+            neighbor_tier = tier_map.get(neighbor)
+            if neighbor_tier is None:
+                continue
+            if neighbor_tier > router_tier:
+                pref = customer_pref
+                relationship = "customer"
+            elif neighbor_tier < router_tier:
+                pref = provider_pref
+                relationship = "provider"
             else:
-                # An Opfer (router1) senden wir es MIT no-export, damit diese es nicht an den Transit-Router (router2) zurückwerfen!
-                config += f"\n  neighbor {conn['neighbor_ip']} route-map RM-MITM-VICTIM out\n"
+                relationship = "peer"
+                pref = peer_pref
 
-    config += """
- exit-address-family
-!
-!
-"""
-    if attack_type == 'mitm':
-        config += f"""
-ip prefix-list PL-MITM seq 5 permit {prefix}
-!
-route-map RM-NO-MITM deny 10
- match ip address prefix-list PL-MITM
-!
-route-map RM-NO-MITM permit 20
-!
-route-map RM-MITM-VICTIM permit 10
- match ip address prefix-list PL-MITM
- set community no-export
-!
-route-map RM-MITM-VICTIM permit 20
-!
-"""
-    
-    # Schreiben
-    with open(f'generated/configs/{censor_name}.conf', 'w') as f:
-        f.write(config)
+            policies.append(
+                {
+                    "node": router,
+                    "neighbor": neighbor,
+                    "match": "all",
+                    "local_preference": pref,
+                    "relationship": relationship,
+                }
+            )
 
-if not args.no_deploy:
-    deploy_cwd = os.path.join(bash_dir, "generated")
-    if not args.no_hard_clean:
-        list_cmd = [
-            "sudo",
-            "docker",
-            "ps",
-            "-a",
-            "-q",
-            "--filter",
-            "label=containerlab=bgp-testbed",
+    return policies, tier_map
+
+
+def build_customer_cones(tier_map, links):
+    if not tier_map:
+        return {}
+
+    provider_to_customers = {node: set() for node in tier_map}
+    for node_a, node_b in links:
+        if node_a not in tier_map or node_b not in tier_map:
+            continue
+        tier_a = tier_map[node_a]
+        tier_b = tier_map[node_b]
+        if tier_a < tier_b:
+            provider_to_customers[node_a].add(node_b)
+        elif tier_b < tier_a:
+            provider_to_customers[node_b].add(node_a)
+
+    cones = {}
+    for node in tier_map:
+        stack = list(provider_to_customers.get(node, []))
+        seen = set()
+        while stack:
+            current = stack.pop()
+            if current in seen:
+                continue
+            seen.add(current)
+            stack.extend(provider_to_customers.get(current, []))
+        cones[node] = sorted(seen)
+
+    return cones
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Generate Containerlab topology and configs."
+    )
+    parser.add_argument(
+        "--scenario",
+        default=DEFAULT_SCENARIO,
+        help="Path to the scenario YAML (relative to repo root or absolute).",
+    )
+    parser.add_argument(
+        "--no-deploy",
+        action="store_true",
+        help="Only generate files; do not run containerlab deploy.",
+    )
+    parser.add_argument(
+        "--sudo",
+        action="store_true",
+        help="Run containerlab deploy with sudo.",
+    )
+    parser.add_argument(
+        "--no-graph",
+        action="store_true",
+        help="Do not generate the containerlab graph.",
+    )
+    parser.add_argument(
+        "--no-hard-clean",
+        action="store_true",
+        help="Skip force-removal of lab containers before deploy.",
+    )
+    parser.add_argument(
+        "--start-ui",
+        action="store_true",
+        help="Start the web UI server after generating the topology.",
+    )
+    parser.add_argument("--ui-host", default="127.0.0.1")
+    parser.add_argument("--ui-port", type=int, default=8080)
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    bash_dir = ensure_repo_root()
+    scenario_path = resolve_scenario_path(bash_dir, args.scenario)
+
+    reset_generated_dir()
+    data = load_scenario(scenario_path)
+
+    write_scenario_snapshot(data, scenario_path, bash_dir)
+
+    routers = data["routers"]
+    censors = data.get("censors", [])
+    rpki_routers = data.get("rpki_routers", [])
+    links = data["links"]
+    policies = data.get("policies", [])
+    customer_cones = {}
+    tier_policies = build_tier_policies(data, links)
+    if tier_policies:
+        tier_policies, tier_map = tier_policies
+        policies = policies + tier_policies
+        customer_cones = build_customer_cones(tier_map, links)
+
+    all_nodes = routers + [c["name"] for c in censors]
+    connections, link_details = build_connections(links, all_nodes)
+
+    write_lab_file(data, routers, censors, rpki_routers, link_details)
+    if rpki_routers:
+        write_roas(routers)
+
+    build_router_configs(routers, connections, policies, rpki_routers, customer_cones)
+    build_censor_configs(censors, connections, policies)
+
+    run_deploy(args, bash_dir)
+
+    if args.start_ui:
+        ui_path = os.path.join(bash_dir, "webui", "server.py")
+        ui_cmd = [
+            "python3",
+            ui_path,
+            "--host",
+            args.ui_host,
+            "--port",
+            str(args.ui_port),
         ]
-        result = subprocess.run(list_cmd, capture_output=True, text=True, check=False)
-        container_ids = [cid for cid in result.stdout.split() if cid]
-        if container_ids:
-            rm_cmd = ["sudo", "docker", "rm", "-f", *container_ids]
-            subprocess.run(rm_cmd, check=False)
-    deploy_cmd = ["containerlab", "deploy", "-t", "lab.clab.yaml", "--reconfigure"]
-    if args.sudo:
-        deploy_cmd.insert(0, "sudo")
-    subprocess.run(deploy_cmd, cwd=deploy_cwd, check=True)
-    if not args.no_graph:
-        subprocess.run(["pkill", "-f", "containerlab graph"], check=False)
-        graph_cmd = ["containerlab", "graph", "-t", "lab.clab.yaml"]
-        if args.sudo:
-            graph_cmd.insert(0, "sudo")
-        subprocess.Popen(
-            graph_cmd,
-            cwd=deploy_cwd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        subprocess.Popen(ui_cmd, cwd=bash_dir)
+        print(f"UI started on http://{args.ui_host}:{args.ui_port}")
+
+
+if __name__ == "__main__":
+    main()

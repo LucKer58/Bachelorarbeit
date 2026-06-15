@@ -20,7 +20,15 @@ clab-bgp-testbed-t
 
 # Spezifisch generierte Testbed-Dateien
 generated/configs/roas.json
+generated/
+
+scenarios/random_runs
 
 # Betriebssystem
 .DS_Store
 Thumbs.db
+
+# Lokale Dokumentation/Notizen
+implementation.tex
+CLAUDE.md
+

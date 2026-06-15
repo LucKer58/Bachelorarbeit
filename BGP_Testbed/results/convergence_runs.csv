@@ -1,0 +1,7 @@
+run,tier,scenario,target,censor,mode,conv_run,affected,decensor_net_s,ping_net_s,reachability_lost,error
+run_001,1,1_subprefix_hijack,AS24,AS2,graceful,1,28,1.084,1.084,0,
+run_001,1,1_subprefix_hijack,AS24,AS2,stop,1,28,1.426,1.426,0,
+run_001,2,1_subprefix_hijack,AS24,AS7,graceful,1,28,1.027,1.027,0,
+run_001,2,1_subprefix_hijack,AS24,AS7,stop,1,28,2.372,2.372,2,
+run_001,3,1_subprefix_hijack,AS24,AS20,graceful,1,24,3.813,2.022,4,
+run_001,3,1_subprefix_hijack,AS24,AS20,stop,1,24,1.918,1.918,4,

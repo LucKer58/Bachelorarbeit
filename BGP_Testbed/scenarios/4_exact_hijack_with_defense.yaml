@@ -1,38 +1,24 @@
 name: bgp-testbed
 
-# ========== ROUTER ==========
-# router1 = Opfer (Inland)
-# router2 = Transit
-# router3 = Ziel (Ausland)
 routers:
-- router1
-- router2
-- router3
+- AS1
+- AS2
+- AS3
 
-# ========== LINKS ==========
 links:
-- [router1, router2]
-- [router2, router3]
-- [router1, censor1]
+- [AS1, AS2]
+- [AS2, AS3]
+- [AS1, censor1]
 
-# ========== ZENSOREN ==========
 censors:
 - name: censor1
-  target_router: router3
+  target_router: AS3
   attack_type: hijack
   prefix_type: exact
 
-# ========== POLICIES ==========
 policies:
-# Router1 wendet AS-Path Prepending (als Defense) auf die verdächtige Zensur-Route an
-- node: router1
+- node: AS1
   neighbor: censor1
-  target_node: router3
+  target_node: AS3
   prepend_asn: 65901
   prepend_count: 5
-
-# ERWARTETES RESULTAT:
-# router1 wählt router2 (den echten Weg). Ohne diese Policy würde der Zensor gewinnen 
-# (weil 1 Hop < 2 Hops). Durch das Prepending auf router1 machen wir den Zensorpfad 
-# aber "künstlich" lang (1 + 5 = 6 Hops). Router1 verwirft den langen Zensorpfad.
-# Der Hijack ist erfolgreich abgewehrt!
