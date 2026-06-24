@@ -3,8 +3,8 @@
 
 Reads the two experiment CSVs, prints summary tables (mean +/- std across runs), and
 writes a set of figures for the thesis. Hijack-success data comes from
-run_random_experiments.py (results/random_runs.csv); convergence data from
-run_convergence_batch.py (results/convergence_runs.csv, optional).
+run_random_experiments.py (results/csv/random_runs.csv); convergence data from
+run_convergence_batch.py (results/csv/convergence_runs.csv, optional).
 
 This is an *analysis* script and deliberately separate from the testbed runtime: it is
 the only part of the project that needs pandas/matplotlib/seaborn
@@ -85,6 +85,10 @@ COMPARISONS = {
         "RPKI vs. origin spoofing",
         ["6_rpki_test", "7_origin_spoofing_rpki"],
     ),
+    "subprefix_vs_mitm": (
+        "Subprefix hijack vs. subprefix + MITM",
+        ["1_subprefix_hijack", "9_mitm_attack"],
+    ),
 }
 
 
@@ -145,7 +149,7 @@ def print_hijack_tables(df, outdir: str) -> None:
     ).reindex(ATTACK_ORDER)
     pivot["mean"] = df.groupby("scenario")["hijack_rate"].mean().reindex(ATTACK_ORDER)
     print(pivot.round(1).to_string())
-    pivot.round(2).to_csv(os.path.join(outdir, "table_hijack_by_attack_tier.csv"))
+    pivot.round(2).to_csv(os.path.join(os.path.dirname(outdir), "csv", "table_hijack_by_attack_tier.csv"))
 
     runs = df["run"].nunique() if "run" in df else "?"
     print(f"\n(std across {runs} runs)")
@@ -157,7 +161,7 @@ def print_convergence_tables(df, outdir: str) -> None:
     print("\n=== Convergence: mean de-hijack recovery (s) by tier x mode ===")
     pivot = df.pivot_table(index="tier", columns="mode", values="decensor_net_s", aggfunc="mean")
     print(pivot.round(3).to_string())
-    pivot.round(4).to_csv(os.path.join(outdir, "table_convergence_by_tier_mode.csv"))
+    pivot.round(4).to_csv(os.path.join(os.path.dirname(outdir), "csv", "table_convergence_by_tier_mode.csv"))
     if {"graceful", "stop"}.issubset(pivot.columns):
         cost = (pivot["stop"] - pivot["graceful"]).round(3)
         print("\nDetection cost (stop - graceful), per tier:")
@@ -172,7 +176,7 @@ def plot_hijack(df, outdir: str, fmt: str, dpi: int) -> None:
     pivot = df.pivot_table(index="scenario", columns="tier", values="hijack_rate",
                            aggfunc="mean").reindex(ATTACK_ORDER)
     pivot.index = [ATTACK_LABELS.get(s, s) for s in pivot.index]
-    fig, ax = plt.subplots(figsize=(6, 6))
+    fig, ax = plt.subplots(figsize=(7.5, 4.2))
     sns.heatmap(pivot, annot=True, fmt=".0f", cmap="Reds", vmin=0, vmax=100,
                 cbar_kws={"label": "Hijack rate (%)"}, ax=ax)
     n_attacks = sum(1 for s in ATTACK_ORDER if s not in DEFENSE_IDS)
@@ -184,7 +188,7 @@ def plot_hijack(df, outdir: str, fmt: str, dpi: int) -> None:
     # 2. Run-to-run variation, one panel per tier. Each box = spread of an attack's
     #    hijack rate across the runs at that tier (how reproducible the result is).
     tiers = sorted(df["tier"].unique())
-    fig, axes = plt.subplots(1, len(tiers), figsize=(6 * len(tiers), 5), sharey=True)
+    fig, axes = plt.subplots(1, len(tiers), figsize=(4.5 * len(tiers), 4.5), sharey=True)
     if len(tiers) == 1:
         axes = [axes]
     for ax, t in zip(axes, tiers):
@@ -196,7 +200,6 @@ def plot_hijack(df, outdir: str, fmt: str, dpi: int) -> None:
         ax.set(xlabel="", title=f"Tier {t}")
         ax.set_ylabel("Hijack rate (%)" if ax is axes[0] else "")
         _rotate(ax)
-    fig.suptitle("Hijack-rate distribution across runs, per attacker tier")
     save_fig(fig, outdir, "hijack_distribution_by_tier", fmt, dpi)
 
 
@@ -221,12 +224,12 @@ def plot_comparisons(df, outdir: str, fmt: str, dpi: int) -> None:
         palette = {ref_label: "0.6"}
         palette.update(dict(zip(others, sns.color_palette("tab10", len(others)))))
 
-        fig, ax = plt.subplots(figsize=(7, 5))
+        fig, ax = plt.subplots(figsize=(5.5, 4))
         sns.pointplot(data=sub, x="tier", y="hijack_rate", hue="attack", hue_order=order,
                       palette=palette, errorbar=("ci", 95), seed=0, dodge=0.2, ax=ax)
         ax.set(xlabel="Attacker tier (1 = core, 3 = edge)", ylabel="Hijack rate (%)",
-               title=title, ylim=(0, 105))
-        ax.legend(title="Attack (grey = reference)", fontsize=8)
+               ylim=(0, 105))
+        ax.legend(title="Attack (grey = reference)", fontsize=9)
         save_fig(fig, outdir, name, fmt, dpi)
 
 
@@ -236,13 +239,32 @@ def plot_convergence(df, outdir: str, fmt: str, dpi: int) -> None:
     # (Control- vs. data-plane is deliberately not plotted: in this setup the two
     # planes recover together, so the figure would be two identical bars -- note it in
     # the text instead.)
-    fig, ax = plt.subplots(figsize=(7, 5))
+    fig, ax = plt.subplots(figsize=(5.5, 4))
     sns.barplot(data=df, x="tier", y="decensor_net_s", hue="mode", errorbar=("ci", 95),
                 seed=0, ax=ax)
-    ax.set(xlabel="Attacker tier", ylabel="De-hijack recovery (s)",
-           title="Convergence time by attacker tier and withdrawal mode")
+    ax.set(xlabel="Attacker tier", ylabel="De-hijack recovery (s)")
     ax.legend(title="Withdrawal mode")
     save_fig(fig, outdir, "convergence_by_tier_mode", fmt, dpi)
+
+
+def plot_detection_cost(df, outdir: str, fmt: str, dpi: int) -> None:
+    # Cost of *detecting* a dead session: per (run, tier, ...) we pair the graceful and
+    # stop recovery times and plot their difference (stop - graceful) by tier, 95% CI.
+    keys = [k for k in ("run", "tier", "scenario", "target", "censor", "conv_run")
+            if k in df.columns]
+    wide = df.pivot_table(index=keys, columns="mode", values="decensor_net_s")
+    if not {"graceful", "stop"}.issubset(wide.columns):
+        return
+    wide = wide.dropna(subset=["graceful", "stop"]).reset_index()
+    wide["cost"] = wide["stop"] - wide["graceful"]
+    wide["tier_label"] = "Tier " + wide["tier"].astype(int).astype(str)
+
+    fig, ax = plt.subplots(figsize=(5.5, 4))
+    sns.barplot(data=wide, x="tier_label", y="cost", errorbar=("ci", 95), seed=0,
+                color=_TAB10[0], ax=ax)
+    ax.set(xlabel="Attacker tier",
+           ylabel="Detection cost (stop − graceful) [s]")
+    save_fig(fig, outdir, "detection_cost_by_tier", fmt, dpi)
 
 
 def load_coalition(path: str):
@@ -274,12 +296,11 @@ def plot_coalition(df, outdir: str, fmt: str, dpi: int) -> None:
     # Hijack reach as the attacker coalition grows: one line per attacker tier, 95% CI
     # across runs. The dashed line marks full capture (100%). Note the denominator shrinks
     # with k (censors are not sources), so 100% = all remaining non-censor ASes.
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(6.5, 4))
     sns.lineplot(data=df, x="k", y="hijack_rate", hue="tier_label", marker="o",
                  errorbar=("ci", 95), seed=0, palette=TIER_PALETTE, ax=ax)
     ax.axhline(100, color="0.5", linestyle="--", linewidth=0.8)
     ax.set(xlabel="Number of colluding censors (k)", ylabel="Hijack rate (%)",
-           title="Attacker coalition: hijack reach vs. number of censors (exact prefix)",
            ylim=(0, 105))
     ax.set_xticks(sorted(df["k"].unique()))
     ax.legend(title="Attacker tier")
@@ -289,13 +310,12 @@ def plot_coalition(df, outdir: str, fmt: str, dpi: int) -> None:
 def plot_rpki_sweep(df, outdir: str, fmt: str, dpi: int) -> None:
     # True hijack rate (sources actually using the /25) as RPKI/ROV is deployed core-first:
     # one line per attacker tier, 95% CI across runs. The dashed line marks "useless" (0%).
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(6.5, 4))
     sns.lineplot(data=df, x="m", y="true_hijack_rate", hue="tier_label", marker="o",
                  errorbar=("ci", 95), seed=0, palette=TIER_PALETTE, ax=ax)
     ax.axhline(0, color="0.5", linestyle="--", linewidth=0.8)
     ax.set(xlabel="Number of RPKI/ROV routers (core-first deployment)",
            ylabel="True hijack rate (%)",
-           title="RPKI deployment threshold: sub-prefix hijack neutralized",
            ylim=(-2, 105))
     ax.set_xticks(sorted(df["m"].unique()))
     ax.legend(title="Attacker tier")
@@ -306,17 +326,25 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--hijack-csv", default=os.path.join("results", "random_runs.csv"))
-    parser.add_argument("--convergence-csv", default=os.path.join("results", "convergence_runs.csv"))
-    parser.add_argument("--coalition-csv", default=os.path.join("results", "coalition.csv"))
-    parser.add_argument("--rpki-sweep-csv", default=os.path.join("results", "rpki_sweep.csv"))
+    parser.add_argument("--hijack-csv", default=os.path.join("results", "csv", "random_runs.csv"))
+    parser.add_argument("--convergence-csv", default=os.path.join("results", "csv", "convergence_runs.csv"))
+    parser.add_argument("--coalition-csv", default=os.path.join("results", "csv", "coalition.csv"))
+    parser.add_argument("--rpki-sweep-csv", default=os.path.join("results", "csv", "rpki_sweep.csv"))
     parser.add_argument("--outdir", default=os.path.join("results", "plots"))
     parser.add_argument("--format", choices=["png", "pdf"], default="png",
                         help="Figure format (pdf = vector, best for LaTeX).")
     parser.add_argument("--dpi", type=int, default=150)
     args = parser.parse_args()
 
-    sns.set_theme(style="whitegrid", context="paper")
+    # Larger axis labels/ticks; titles are dropped in favour of the LaTeX figure captions.
+    sns.set_theme(style="whitegrid", context="paper", rc={
+        "axes.labelsize": 14,
+        "axes.titlesize": 14,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12,
+        "legend.fontsize": 11,
+        "legend.title_fontsize": 12,
+    })
     os.makedirs(args.outdir, exist_ok=True)
 
     hijack = load_hijack(args.hijack_csv)
@@ -340,6 +368,7 @@ def main() -> int:
     if convergence is not None:
         print_convergence_tables(convergence, args.outdir)
         plot_convergence(convergence, args.outdir, args.format, args.dpi)
+        plot_detection_cost(convergence, args.outdir, args.format, args.dpi)
     else:
         print(f"\n(skipping convergence analysis: {args.convergence_csv} not found "
               "-- run scripts/run_convergence_batch.py first)")

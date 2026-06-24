@@ -20,7 +20,7 @@ TWO metrics are logged, because they differ:
 Blackhole nuance: we also log legit / no_route -- under RPKI a source may be blackholed
 (no_route) rather than recovered to legit.
 
-Output CSV (results/rpki_sweep.csv):
+Output CSV (results/csv/rpki_sweep.csv):
     run, attacker_tier, m, target, censor, rpki_routers, total, hijacked, true_hijacked,
     legit, no_route, hijack_rate, true_hijack_rate, error
 """
@@ -154,7 +154,7 @@ def main():
     p.add_argument("--settle", type=float, default=22.0)
     p.add_argument("--stop-at-0", action="store_true",
                    help="Skip larger m once true-hijack hits 0%% (saves time).")
-    p.add_argument("--output", default=os.path.join("results", "rpki_sweep.csv"))
+    p.add_argument("--output", default=os.path.join("results", "csv", "rpki_sweep.csv"))
     p.add_argument("--sudo", action="store_true")
     args = p.parse_args()
 

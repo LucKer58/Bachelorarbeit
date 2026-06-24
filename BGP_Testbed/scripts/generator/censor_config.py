@@ -231,7 +231,7 @@ route-map {ORIGIN_ROUTE_MAP} permit 10
         config += f"""
 !
 router bgp {censor_asn}
- bgp router-id 9{censor_num}.9{censor_num}.9{censor_num}.9{censor_num}
+ bgp router-id {90 + censor_num}.{90 + censor_num}.{90 + censor_num}.{90 + censor_num}
  no bgp bestpath compare-age
  bgp bestpath compare-routerid
  no bgp ebgp-requires-policy"""

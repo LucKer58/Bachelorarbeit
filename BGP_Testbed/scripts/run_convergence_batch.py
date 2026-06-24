@@ -137,8 +137,8 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, default=60.0, help="Per-recovery timeout (s).")
     parser.add_argument("--poll", type=float, default=0.5, help="Sampling interval (s).")
     parser.add_argument(
-        "--output", default=os.path.join("results", "convergence_runs.csv"),
-        help="Aggregate CSV path (default: results/convergence_runs.csv).",
+        "--output", default=os.path.join("results", "csv", "convergence_runs.csv"),
+        help="Aggregate CSV path (default: results/csv/convergence_runs.csv).",
     )
     parser.add_argument("--sudo", action="store_true", help="Pass --sudo to deploy + measure.")
     parser.add_argument("--no-hard-clean", action="store_true", help="Skip container cleanup.")
@@ -208,7 +208,7 @@ def main() -> int:
                 time.sleep(args.settle)
 
                 tmp = tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".csv", delete=False, dir=os.path.join(BASE_DIR, "results")
+                    mode="w", suffix=".csv", delete=False, dir=os.path.join(BASE_DIR, "results", "csv")
                 )
                 tmp.close()
                 measure_cmd = [

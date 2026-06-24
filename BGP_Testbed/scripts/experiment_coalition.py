@@ -10,14 +10,16 @@ Reuses the live pipeline (generate_topology.py + evaluate_hijack_impact.py) and 
 scenario-building primitives from generate_random_scenarios.py. Targets are taken from the
 random-runs manifest when present, so placements match the main study.
 
-LIMITATION: censor numbering caps at censor9 -- the router-id 9N.9N.9N.9N is only valid for
-N <= 9. So k is capped at 9: tier1 (3 AS) and tier2 (7 AS) fit fully, tier3 (19 AS) is
-capped at 9. If tier3 has not reached 100% by k=9, report it as a saturation/lower bound.
+Censor numbering: the router-id is {90+N}.{90+N}.{90+N}.{90+N}, which stays a valid dotted
+quad for N up to 165 (and the censor ASN 65900+N up to N=99), so every tier can be swept
+fully: tier1 (3 AS), tier2 (7 AS) and tier3 (20 AS). k per tier is bounded only by the tier's
+pool size -- with the target excluded, tier3 yields up to 19 censors. MAX_CENSOR_NUM is just a
+safety ceiling well above any tier.
 
 NOTE on the metric: censors are not counted as sources, so the denominator shrinks with k;
 "100%" means 100% of the remaining non-censor ASes route via some censor.
 
-Output CSV (results/coalition.csv):
+Output CSV (results/csv/coalition.csv):
     run, tier, k, target, censors, total, hijacked, legit, no_route, hijack_rate, error
 """
 import argparse
@@ -35,7 +37,7 @@ from generate_random_scenarios import (  # noqa: E402
     FlowSeq, dump_yaml, load_yaml,
 )
 
-MAX_CENSOR_NUM = 9  # router-id 9N.9N.9N.9N is only valid for N <= 9
+MAX_CENSOR_NUM = 30  # safety ceiling; router-id {90+N} valid for N<=165, censor ASN 65900+N for N<=99
 SUMMARY_RE = re.compile(
     r"Summary: total=(\d+) hijacked=(\d+) legit=(\d+) no-route=(\d+) other=(\d+) hijack_rate=([0-9.]+)%"
 )
@@ -84,8 +86,17 @@ def deploy(path, sudo):
     return run_cmd(cmd).returncode == 0
 
 
-def wait_stable(path, settle, interval=4.0, timeout=90.0, need=2):
-    """Poll the evaluator until the summary is identical `need` times with no_route==0."""
+def wait_stable(path, settle, interval=5.0, timeout=120.0, need=3):
+    """Poll the evaluator until the summary is identical `need` times with no_route==0.
+
+    `need` is deliberately > 2: for a tier-1 exact-prefix hijack the censor route
+    propagates downward to everyone faster than the victim's legitimate route climbs
+    up from a tier-3 origin, producing a transient "100% hijacked, no_route==0"
+    plateau right after deploy. A too-eager check (need==2, short window) can lock
+    onto that transient and record a spurious 100%. Requiring `need` identical polls
+    over interval*need seconds, on top of a generous --settle, lets the slow legit
+    route arrive before the summary is accepted.
+    """
     time.sleep(settle)
     cmd = ["python3", "scripts/evaluate_hijack_impact.py", "--quiet", "--scenario", path]
     start, sig, consec, last = time.monotonic(), None, 0, None
@@ -120,7 +131,7 @@ def main():
     p.add_argument("--settle", type=float, default=20.0)
     p.add_argument("--stop-at-100", action="store_true",
                    help="Skip larger k once 100%% is reached (saves time).")
-    p.add_argument("--output", default=os.path.join("results", "coalition.csv"))
+    p.add_argument("--output", default=os.path.join("results", "csv", "coalition.csv"))
     p.add_argument("--sudo", action="store_true")
     args = p.parse_args()
 
@@ -151,6 +162,13 @@ def main():
             for tier in tiers:
                 pool = [a for a in tiers_by_num.get(tier, []) if a != target]
                 random.Random(f"{args.seed}-{run_key}-{tier}").shuffle(pool)
+                # Start the coalition from the manifest's censor for this tier, so k=1
+                # uses the SAME attacker as the single-censor exact-hijack sweep and the
+                # curve starts at that baseline; the rest of the coalition is added on top.
+                manifest_censor = (manifest_runs.get(run_key, {}).get("censors") or {}).get(str(tier))
+                if manifest_censor and manifest_censor in pool:
+                    pool.remove(manifest_censor)
+                    pool.insert(0, manifest_censor)
                 kmax = min(len(pool), cap)
                 reached = None
                 for k in range(1, kmax + 1):

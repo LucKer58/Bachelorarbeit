@@ -462,8 +462,8 @@ def main() -> int:
     )
     parser.add_argument(
         "--output",
-        default=os.path.join("results", "random_runs.csv"),
-        help="CSV output path (default: results/random_runs.csv).",
+        default=os.path.join("results", "csv", "random_runs.csv"),
+        help="CSV output path (default: results/csv/random_runs.csv).",
     )
     parser.add_argument(
         "--keep-going",

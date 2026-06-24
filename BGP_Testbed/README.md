@@ -4,16 +4,30 @@
 This repository contains the virtualized BGP/IP testbed using Docker, Containerlab, and FRRouting.
 
 ## Requirements
-- WSL2 (Windows Subsystem for Linux) - for Windows users
-- Docker Desktop (with WSL2 integration enabled)
+- WSL2 (Windows Subsystem for Linux) — for Windows users
+- Docker (Docker Desktop with WSL2 integration, or native Docker Engine)
 - Containerlab
-- VS Code
+- Python 3.12 (the testbed runtime needs only PyYAML; the analysis step needs pandas/matplotlib/seaborn)
+
+## Initial setup (once)
+
+All commands in this README are run from the `BGP_Testbed/` directory.
+
+```bash
+# Testbed runtime (generator/evaluator/experiments) needs only PyYAML:
+pip install pyyaml
+
+# Analysis + figures (scripts/aggregate_results.py) need extra deps — keep them in a venv
+# so the runtime path stays stdlib + PyYAML:
+python3 -m venv venv
+./venv/bin/pip install -r requirements-analysis.txt
+```
 
 ## Setup of the Topology using FRRouting
 
 All commands below are run from the `BGP_Testbed/` directory.
 
-### 1. Generate and Deploy the Topology
+### Generate and Deploy the Topology
 The generator compiles a scenario YAML into FRRouting configs and a Containerlab topology
 under `generated/`, then deploys it with `containerlab deploy --reconfigure`:
 ```bash
@@ -25,18 +39,17 @@ Generate, deploy, and start the web UI in one step:
 python3 scripts/generate_topology.py --scenario scenarios/sub_prefix_30.yaml --start-ui --sudo
 ```
 
+If the address is already in use, run the following:
+```bash
+pkill -f "webui/server.py"
+```
+
 To redeploy the already-generated topology directly with Containerlab:
 ```bash
 sudo containerlab deploy -t generated/lab.clab.yaml --reconfigure
 ```
 
-### 2. Verify Deployment
-```bash
-# Check containers are running
-sudo containerlab inspect -t generated/lab.clab.yaml
-```
-
-### 3. Observe BGP Status
+### Observe BGP Status
 
 #### Check BGP Neighbors
 ```bash
@@ -65,15 +78,9 @@ docker exec -it clab-bgp-testbed-AS1 vtysh -c "clear ip bgp *"
 docker exec clab-bgp-testbed-AS3 ping 192.168.4.1 -I 192.168.3.1 -c 4
 ```
 
-**Quick connectivity test (Docker management network):**
-```bash
-# This uses Docker's internal network, not BGP routes
-docker exec clab-bgp-testbed-AS1 ping AS4 -c 4
-```
-
 **Note:** Always use loopback IPs (192.168.x.1) for BGP testing. Point-to-point link IPs (10.0.x.x) are not announced in BGP.
 
-### 4. Interactive Shell. This is useful if you want to focus on one AS in particular and run commands easier
+### Interactive Shell. This is useful if you want to focus on one AS in particular and run commands easier
 ```bash
 # AS1
 docker exec -it clab-bgp-testbed-AS1 vtysh
@@ -90,20 +97,10 @@ Now you can run the commands like this and inspect the outcome:
 - exit
 
 ```
-### 5. View topology as graph
-`generate_topology.py` already starts this graph server automatically (unless you pass
-`--no-graph`). To start it manually:
-```bash
-sudo containerlab graph -t generated/lab.clab.yaml
-```
-```bash
-# Enter the following in your browser to view the topology
-localhost:50080
-```
 
-### 5.1 Web UI: Route viewer
+### Web UI: Route viewer
 This UI shows the topology, lets you pick source/target ASs, and fetches the
-best path via `show ip bgp` with hijack detection.
+best path via `show ip bgp` with hijack detection. Use this if the topology is already deployed.
 
 ```bash
 cd BGP_Testbed
@@ -127,7 +124,7 @@ python3 scripts/generate_topology.py --scenario scenarios/sub_prefix_30.yaml --s
 For measuring hijack impact, running the randomized experiment pipeline, and timing recovery on
 the deployed lab, see the [Evaluation](#evaluation) section below.
 
-### 6. Cleanup or Redeploy
+### Cleanup or Redeploy
 ```bash
 sudo containerlab destroy -t generated/lab.clab.yaml
 sudo containerlab deploy -t generated/lab.clab.yaml --reconfigure
@@ -193,6 +190,39 @@ All evaluation scripts are run from `BGP_Testbed/` and read `generated/scenario.
 written by `generate_topology.py`) to learn the target, censor names, prefix type, and tiers of
 whatever lab is currently deployed.
 
+### 0. Reproduce everything from scratch (A–Z)
+
+The randomized scenario batch under `scenarios/random_runs/` is **not committed to git**
+(it is regenerated deterministically from a seed), so the first step is always to
+regenerate it. The full pipeline, run from `BGP_Testbed/` (append `--sudo` to the
+deploy/measure steps if you are not in the `docker` group):
+
+```bash
+# 1. Generate the randomized scenario batch  -> scenarios/random_runs/ (+ manifest.yaml)
+python3 scripts/generate_random_scenarios.py --runs 10 --seed 1337
+
+# 2. Hijack-success sweep  -> results/csv/random_runs.csv
+python3 scripts/run_random_experiments.py --runs 10 --wait-bgp --wait-stable
+
+# 3. Attacker-coalition curve  -> results/csv/coalition.csv
+python3 scripts/experiment_coalition.py --runs 10 --tiers 1,2,3
+
+# 4. RPKI deployment threshold  -> results/csv/rpki_sweep.csv
+python3 scripts/experiment_rpki_sweep.py --runs 3 --tiers 1,2,3
+
+# 5. Convergence / recovery time  -> results/csv/convergence_runs.csv
+python3 scripts/run_convergence_batch.py --runs 10 --mode both
+
+# 6. Tables + figures  -> results/plots/  (uses the analysis venv)
+./venv/bin/python scripts/aggregate_results.py
+```
+
+Steps 2–5 are independent — run only the ones you need. Each deploys dozens of labs
+sequentially and takes from minutes (sweep) to a few hours (coalition with full
+Tier-3 sweeps), so consider running them in the background. All result CSVs land in
+`results/csv/`, all figures in `results/plots/`. The sections below explain each step
+and its options in detail.
+
 ### 1. Hijack impact (single deployed scenario)
 
 The evaluator queries every source AS's best path to the target prefix and classifies it as
@@ -201,31 +231,69 @@ hijacked / legit / no-route / other, then prints a summary line
 ```bash
 python3 scripts/evaluate_hijack_impact.py            # per-source detail + summary
 python3 scripts/evaluate_hijack_impact.py --quiet    # summary line only
-python3 scripts/evaluate_hijack_impact.py --output results/impact.csv   # also write per-source CSV
+python3 scripts/evaluate_hijack_impact.py --output results/csv/impact.csv   # also write per-source CSV
 ```
 Useful overrides: `--target AS4` (force a different target), `--sources AS1,AS2,AS5` (limit the
 observers), `--include-censors` / `--include-target`.
 
-### 2. Randomized experiment pipeline
+### 2. Generate the randomized scenario batch (do this first)
 
-Generates a batch of scenarios (default 30-AS topology, 3 tiers × 10 attack types), deploys each,
-waits for convergence, and records one summary row per scenario to a CSV:
+`scenarios/random_runs/` is **git-ignored** — it is *not* on GitHub and must be
+regenerated locally before any batch experiment (steps 3–6 below). One deterministic
+command produces all runs, each a different victim + attacker placement on the fixed
+30-AS / 3-tier topology, plus a `manifest.yaml` that pins the target and per-tier
+censor of every run:
 ```bash
-# 1. Generate the scenario batch into scenarios/random_runs/ (deterministic from one seed)
 python3 scripts/generate_random_scenarios.py --runs 10 --seed 1337
-
-# 2. Deploy + evaluate every generated scenario -> results/random_runs.csv
-python3 scripts/run_random_experiments.py --runs 10 --settle 25 --wait-stable --sudo
 ```
-`--runs 10 --seed 1337` draws 10 *different* scenarios (each a new victim + attacker placement)
-from a single deterministic RNG — that one command is fully reproducible, so you do **not** change
-the seed per run. The 30-AS, 3-tier topology graph is fixed; what varies is placement.
-Key flags for the runner: `--wait-bgp` (block until all BGP sessions are up before evaluating),
-`--wait-stable` (re-poll until the summary stops changing / no-route reaches 0), `--wait-rpki`
-(wait for the RPKI cache on `rpki_routers`), `--scenarios 1,7` and `--tiers 1,2` (subset the batch),
-`--output <path>`, `--keep-going` (don't abort on a single failed run).
+This writes `scenarios/random_runs/run_001 … run_010/tier{1,2,3}/<attack>.yaml` and
+`scenarios/random_runs/manifest.yaml`. Because everything derives from one seed you do
+**not** change the seed per run — the single command is fully reproducible, so re-running
+it recreates the exact same batch. The topology graph is fixed; only the placement varies.
 
-### 3. Convergence / recovery time
+### 3. Hijack-success sweep
+
+Deploys every generated scenario (3 tiers × 10 attack types × N runs), waits for
+convergence, and records one summary row per scenario
+(`total / hijacked / legit / no-route / other / hijack_rate`):
+```bash
+python3 scripts/run_random_experiments.py --runs 10 --wait-bgp --wait-stable
+#   -> results/csv/random_runs.csv
+```
+Key flags: `--wait-bgp` (block until all BGP sessions are up before evaluating),
+`--wait-stable` (re-poll until the summary stops changing / no-route reaches 0 —
+strongly recommended for reproducible numbers), `--wait-rpki` (wait for the RPKI cache
+on `rpki_routers`), `--scenarios 1,9` and `--tiers 1,2` (subset the batch),
+`--settle <s>` (post-deploy wait, default 20), `--keep-going` (don't abort on a single
+failed run), `--output <path>`.
+
+### 4. Attacker coalition
+
+For each placement and tier, deploys `k = 1, 2, …` colluding **exact-prefix** censors and
+records the hijack rate, to find the coalition size that reaches 100 %. The first censor is
+the manifest censor, so `k = 1` matches the single-censor exact hijack from the sweep:
+```bash
+python3 scripts/experiment_coalition.py --runs 10 --tiers 1,2,3
+#   -> results/csv/coalition.csv
+```
+Flags: `--max-k <n>` (cap censors per tier; Tier 3 sweeps up to 19), `--stop-at-100`
+(skip larger k once 100 % is reached — faster, but leaves the averaged curve uneven),
+`--seed`, `--settle`. Reads `manifest.yaml` for targets/censors (falls back to a seeded
+random placement if it is absent).
+
+### 5. RPKI deployment threshold
+
+For a sub-prefix hijack, deploys RPKI/ROV validators **core-first** (Tier 1 → 2 → 3) for
+`m = 0, 1, …` routers and records when the *true* hijack rate (traffic actually ending at
+the censor) drops to 0 %:
+```bash
+python3 scripts/experiment_rpki_sweep.py --runs 3 --tiers 1,2,3
+#   -> results/csv/rpki_sweep.csv
+```
+Flags: `--steps 0,1,2,3,5,8,12,…` (custom m-values), `--stop-at-0` (skip larger m once
+true-hijack hits 0 %), `--seed`, `--settle`.
+
+### 6. Convergence / recovery time
 
 Measures how long the network takes to return to normal after the hijack is withdrawn, per observer,
 on both the control plane (censor ASN leaves the best path = residual-censorship duration) and the
@@ -241,7 +309,7 @@ Two withdrawal methods (`--mode`):
 
 ```bash
 # Compare both methods over 5 runs and write per-run/observer detail to CSV
-python3 scripts/measure_convergence.py --mode both --runs 5 --output results/convergence.csv --sudo
+python3 scripts/measure_convergence.py --mode both --runs 5 --output results/csv/convergence.csv --sudo
 
 # Just pure convergence, single run
 python3 scripts/measure_convergence.py --mode graceful --sudo
@@ -252,7 +320,7 @@ Useful flags: `--timeout <s>` (per-run cap; raise it above the BGP hold timer fo
 
 `measure_convergence.py` only ever measures the **currently deployed** lab. To run it across the
 whole randomized batch, use the driver, which deploys each `(run, tier)` and reduces the per-observer
-output to one network-wide recovery value per mode → `results/convergence_runs.csv`:
+output to one network-wide recovery value per mode → `results/csv/convergence_runs.csv`:
 ```bash
 python3 scripts/run_convergence_batch.py --runs 10 --mode both --sudo
 ```
@@ -260,19 +328,23 @@ By default it measures one representative attack (`1_subprefix_hijack`) per run/
 convergence is BGP withdrawal propagation, which barely differs between attack types, so the
 informative axes are attacker tier and withdrawal mode. Override the attack with `--scenario-id`.
 
-### 4. Aggregate + visualize
+### 7. Aggregate + visualize
 
-Turns the two CSVs above into summary tables (mean ± std across runs) and thesis figures. This is the
-only part of the project that needs pandas/matplotlib/seaborn — install them separately:
+Turns the result CSVs into summary tables (mean ± std across runs) and thesis figures. This is the
+only part of the project that needs pandas/matplotlib/seaborn, so run it through the analysis venv
+created during setup:
 ```bash
-pip install -r requirements-analysis.txt
-python3 scripts/aggregate_results.py                 # PNG figures + tables -> results/plots/
-python3 scripts/aggregate_results.py --format pdf     # vector figures for LaTeX
+./venv/bin/python scripts/aggregate_results.py                # PNG figures + tables -> results/plots/
+./venv/bin/python scripts/aggregate_results.py --format pdf   # vector figures for LaTeX
 ```
-It reads `results/random_runs.csv` (hijack success) and, if present, `results/convergence_runs.csv`
-(convergence), and writes: a grouped bar of hijack rate by attack × tier, a per-tier trend line, a
-distribution box/strip plot, an attack × tier heatmap, a defense-effectiveness bar, and (for
-convergence) recovery-by-tier-and-mode bars. The convergence figures are skipped if that CSV is absent.
+It reads the CSVs in `results/csv/` (`random_runs.csv`, `coalition.csv`, `rpki_sweep.csv`,
+`convergence_runs.csv`); each input is optional, and the corresponding figures are simply skipped if
+its CSV is absent. It writes to `results/plots/`: an attack × tier heatmap, a hijack-rate distribution
+plot, the focused attack comparisons (exact vs. subprefix, subprefix vs. poisoning, path manipulation,
+defenses, RPKI evasion, subprefix vs. MITM), the attacker-coalition curve, the RPKI-threshold curve,
+the convergence recovery-by-tier-and-mode bars, and the detection-cost-by-tier bars
+(`stop − graceful`, the cost of detecting a dead session). The summary tables are written next to the
+data as `results/csv/table_*.csv`.
 
 ### Manual verification
 
